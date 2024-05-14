@@ -57,14 +57,13 @@ async fn get_name_magnet_from_episode_page(url: &str) -> Result<(String, String)
             url: url.to_owned(),
         })?
         .select(&scraper::Selector::parse("a[class='btn episode-btn']").unwrap())
-        .filter(|element| {
+        .find(|element| {
             element
                 .value()
                 .attr("href")
                 .map(|href| href.starts_with("magnet:?"))
                 .unwrap_or(false)
         })
-        .next()
         .map(|element| element.value().attr("href").unwrap().to_owned())
         .ok_or(Error::ParseEpisodePage {
             url: url.to_owned(),
