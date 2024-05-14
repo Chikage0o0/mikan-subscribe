@@ -3,7 +3,7 @@ use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Clone)]
 pub struct Subscription {
-    pub bt_url: String,
+    pub magnet: String,
     pub anime_title: String,
     pub file_name: String,
 }
@@ -27,7 +27,7 @@ pub async fn get_feed(url: impl Into<String>) -> Result<Vec<Subscription>, Error
     Ok(subscriptions)
 }
 
-async fn get_anime_name_from_episode_page(url: &str) -> Result<String, Error> {
+async fn get_name_magnet_from_episode_page(url: &str) -> Result<(String, String), Error> {
     let content = reqwest::get(url)
         .await
         .context(FetchEpisodePageSnafu)?
@@ -50,7 +50,27 @@ async fn get_anime_name_from_episode_page(url: &str) -> Result<String, Error> {
         .text()
         .collect::<String>();
 
-    Ok(title)
+    let magnet = document
+        .select(&scraper::Selector::parse("div[class='leftbar-nav']").unwrap())
+        .next()
+        .ok_or(Error::ParseEpisodePage {
+            url: url.to_owned(),
+        })?
+        .select(&scraper::Selector::parse("a[class='btn episode-btn']").unwrap())
+        .filter(|element| {
+            element
+                .value()
+                .attr("href")
+                .map(|href| href.starts_with("magnet:?"))
+                .unwrap_or(false)
+        })
+        .next()
+        .map(|element| element.value().attr("href").unwrap().to_owned())
+        .ok_or(Error::ParseEpisodePage {
+            url: url.to_owned(),
+        })?;
+
+    Ok((magnet, title))
 }
 
 async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
@@ -62,20 +82,11 @@ async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
         item: item.clone(),
         entity: "title".into(),
     })?;
-    let bt_url = item
-        .enclosure
-        .as_ref()
-        .ok_or(Error::ConvertFeed {
-            item: item.clone(),
-            entity: "enclosure".into(),
-        })?
-        .url
-        .clone();
 
-    let title = get_anime_name_from_episode_page(link).await?;
+    let (magnet, title) = get_name_magnet_from_episode_page(link).await?;
 
     Ok(Subscription {
-        bt_url,
+        magnet,
         anime_title: title,
         file_name: name.clone(),
     })
@@ -114,7 +125,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_convert() {
-        let title = get_anime_name_from_episode_page(
+        let (_magnet, title) = get_name_magnet_from_episode_page(
             "https://mikanani.me/Home/Episode/e6057aa20463920c5b7518aa40c8a3d284f10e56",
         )
         .await
