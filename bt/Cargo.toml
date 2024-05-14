@@ -9,4 +9,6 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 
 tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread"] }
+openssl-sys = { version = "0.9.102", features = ["vendored"] }
+redb = "2.1.0"
 [dev-dependencies]

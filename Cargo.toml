@@ -1,6 +1,6 @@
 [workspace]
+members = ["bt", "subscribe"]
 resolver = "2"
-members = ["bt"]
 
 [workspace.package]
 version = "0.1.0"
