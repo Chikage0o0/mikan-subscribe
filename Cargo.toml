@@ -14,3 +14,10 @@ redb = "2"
 url = "2"
 snafu = "0"
 bincode = "1"
+
+[profile.release]
+panic = "abort"   # Strip expensive panic clean-up logic
+lto = "thin"      # Use Thin LTO for better compile times
+strip = true      # Remove debug symbols
+opt-level = "z"
+codegen-units = 1
