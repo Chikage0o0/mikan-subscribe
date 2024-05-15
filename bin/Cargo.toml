@@ -1,0 +1,13 @@
+[package]
+name = "bin"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bt = { path = "../bt" }
+subscribe = { path = "../subscribe" }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+redb.workspace = true
+tracing-subscriber = "0.3.18"
+tracing = "0.1.40"
+clap = { version = "4.5.4", features = ["derive"] }

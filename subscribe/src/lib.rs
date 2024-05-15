@@ -5,7 +5,8 @@ use snafu::{ResultExt, Snafu};
 pub struct Subscription {
     pub magnet: String,
     pub anime_title: String,
-    pub file_name: String,
+    pub url: String,
+    pub name: String,
 }
 
 // Fetch feed from the mikanani.me rss feed
@@ -79,7 +80,7 @@ async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
     })?;
     let name = item.title.as_ref().ok_or(Error::ConvertFeed {
         item: item.clone(),
-        entity: "title".into(),
+        entity: "name".into(),
     })?;
 
     let (magnet, title) = get_name_magnet_from_episode_page(link).await?;
@@ -87,7 +88,8 @@ async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
     Ok(Subscription {
         magnet,
         anime_title: title,
-        file_name: name.clone(),
+        url: link.clone(),
+        name: name.clone(),
     })
 }
 
