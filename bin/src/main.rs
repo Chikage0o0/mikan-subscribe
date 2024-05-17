@@ -1,10 +1,13 @@
 mod db;
 
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 
 use clap::Parser;
+use db::Db;
 use subscribe::get_feed;
+
 use tracing::{error, info, Level};
+use upload_backend::backend::Onedrive;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -32,6 +35,14 @@ async fn main() {
     }
 
     let db = db::Db::db().expect("Failed to create db");
+
+    let onedrive = match get_onedrive_config(db.clone()).await {
+        Some(v) => v,
+        None => {
+            error!("Failed to get onedrive config");
+            return;
+        }
+    };
 
     let session = bt::SessionGuard::get()
         .await
@@ -64,7 +75,7 @@ async fn main() {
             };
 
             session
-                .after_add_torrent(id, &f.anime_title, handle)
+                .after_add_torrent(id, &f.anime_title, handle, &onedrive)
                 .await
                 .unwrap_or_else(|e| {
                     error!("Failed to after_add_torrent: {}", e);
@@ -78,20 +89,63 @@ async fn main() {
         db.clear_expire().unwrap_or_else(|e| {
             error!("Failed to clear expire: {}", e);
         });
+        let refresh_token = onedrive.refresh_token();
+        db.insert_refresh_token(refresh_token).unwrap_or_else(|e| {
+            error!("Failed to insert refresh token: {}", e);
+        });
 
         std::thread::sleep(std::time::Duration::from_secs(60 * 10));
     }
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 struct OnedriveConfig {
     client_id: String,
     client_secret: String,
     folder_path: String,
 }
 
-fn get_onedrive_config() -> impl upload_backend::Backend {
+async fn get_onedrive_config(db: Arc<Db>) -> Option<Onedrive> {
     let config = std::fs::read_to_string("config/onedrive.json").ok()?;
     let config: OnedriveConfig = serde_json::from_str(&config).ok()?;
-    Some(config)
+    let refresh_token = db.get_refresh_token().ok().and_then(|v| v);
+
+    if let Some(refresh_token) = refresh_token {
+        if let Ok(v) = Onedrive::new_with_refresh_token(
+            &config.client_id,
+            &config.client_secret,
+            refresh_token,
+            upload_backend::backend::OnedriveApiType::Organizations,
+            &config.folder_path,
+        )
+        .await
+        {
+            return Some(v);
+        }
+    }
+
+    if let Ok(v) = Onedrive::new_with_code(
+        &config.client_id,
+        &config.client_secret,
+        "http://localhost:20080/redirect",
+        upload_backend::backend::OnedriveApiType::Organizations,
+        &config.folder_path,
+    )
+    .await
+    {
+        return Some(v);
+    }
+
+    None
+}
+
+#[test]
+fn test_get_onedrive_config() {
+    let config = OnedriveConfig {
+        client_id: "client_id".to_string(),
+        client_secret: "client_secret".to_string(),
+        folder_path: "folder_path".to_string(),
+    };
+    let config = serde_json::to_string(&config).unwrap();
+    std::fs::write("onedrive.json", config).unwrap();
 }

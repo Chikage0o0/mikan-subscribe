@@ -1,10 +1,9 @@
+use chrono::Datelike as _;
 use std::{
     fmt::Debug,
-    fs::create_dir_all,
-    path::Path,
     sync::{Arc, OnceLock},
 };
-use tracing::error;
+
 // use db::Db;
 use librqbit::{
     AddTorrent, AddTorrentOptions, AddTorrentResponse, ManagedTorrent, Session, SessionOptions,
@@ -12,11 +11,11 @@ use librqbit::{
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use tracing::info;
+use upload_backend::{backend::Onedrive, Backend};
 
 // mod db;
 
 const DOWNLOADING_PATH: &str = "tmp";
-const DOWNLOAD_PATH: &str = "downloads";
 
 #[derive(Clone)]
 pub struct SessionGuard(Arc<Session>);
@@ -34,7 +33,6 @@ impl SessionGuard {
         }
 
         let mut option = SessionOptions::default();
-        option.enable_upnp_port_forwarding = true;
         option.persistence = true;
         option.persistence_filename = Some("config/session.state".into());
 
@@ -97,7 +95,9 @@ impl SessionGuard {
         id: usize,
         folder_name: &str,
         handle: Arc<ManagedTorrent>,
+        onedrive: &Onedrive,
     ) -> Result<(), Error> {
+        let _ = onedrive;
         info!("Add torrent success: {:?}", handle.info().info);
 
         let tmp_file = match handle.info().info.name.as_ref() {
@@ -105,8 +105,8 @@ impl SessionGuard {
             None => format!("{}/{}", DOWNLOADING_PATH, folder_name),
         };
         let target_file = match handle.info().info.name.as_ref() {
-            Some(file_name) => format!("{}/{}/{}", DOWNLOAD_PATH, folder_name, file_name),
-            None => format!("{}/{}", DOWNLOAD_PATH, folder_name),
+            Some(file_name) => format!("{}/{}/{}", generate_folder_name(), folder_name, file_name),
+            None => format!("{}/{}", generate_folder_name(), folder_name),
         };
 
         handle
@@ -117,22 +117,37 @@ impl SessionGuard {
             })?;
 
         // todo: upload to cloud
-        let session = &self.0;
-        session
-            .delete(id, false)
+        let file = tokio::fs::File::open(&tmp_file).await.unwrap();
+        let size = file.metadata().await.unwrap().len();
+        let mut reader = tokio::io::BufReader::new(file);
+        onedrive
+            .upload(&mut reader, size, &target_file)
+            .await
             .map_err(|error| Error::FinishDownload {
                 error: error.to_string(),
             })?;
 
-        // move to download folder
-        let parent = Path::new(&target_file).parent().unwrap();
-        create_dir_all(parent).unwrap();
-
-        std::fs::rename(&tmp_file, &target_file).unwrap_or_else(|e| {
-            error!("Failed to move {} to {}: {:?}", tmp_file, target_file, e);
-        });
+        let session = &self.0;
+        session
+            .delete(id, true)
+            .map_err(|error| Error::FinishDownload {
+                error: error.to_string(),
+            })?;
 
         Ok(())
+    }
+}
+
+fn generate_folder_name() -> String {
+    let date = chrono::Local::now();
+    let year = date.year();
+    let month = date.month();
+
+    match month {
+        i if i < 4 => format!("{}年{}月", year, 1),
+        i if i < 7 => format!("{}年{}月", year, 4),
+        i if i < 10 => format!("{}年{}月", year, 7),
+        _ => format!("{}年{}月", year, 10),
     }
 }
 
@@ -161,13 +176,4 @@ pub enum Error {
 pub struct Task {
     pub url: String,
     pub anime_title: String,
-}
-
-#[cfg(test)]
-mod test {
-
-    #[tokio::test]
-    async fn test_session_guard() {
-        let _session = super::SessionGuard::get().await.unwrap();
-    }
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["bin", "bt", "subscribe"]
+members = ["bin", "bt", "subscribe", "upload-backend"]
 resolver = "2"
 
 [workspace.package]
@@ -8,7 +8,7 @@ edition = "2021"
 
 [workspace.dependencies]
 serde = "1"
-librqbit = "5"
+librqbit = { version = "5" }
 tokio = "1"
 redb = "2"
 url = "2"

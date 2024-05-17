@@ -4,15 +4,15 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-librqbit.workspace = true
+librqbit = { workspace = true }
 tracing = "0.1.40"
-
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 openssl-sys = { version = "0.9.102", features = ["vendored"] }
 
 url.workspace = true
 snafu.workspace = true
 bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
-
+upload-backend = { path = "../upload-backend" }
+tokio = { workspace = true, features = ["fs", "io-util"] }
+chrono = "0.4.38"
 [dev-dependencies]
