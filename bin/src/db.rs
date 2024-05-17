@@ -6,6 +6,7 @@ use std::{
 use redb::{Error, TableDefinition};
 
 const TABLE: TableDefinition<String, u64> = TableDefinition::new("tasks");
+const ONEDRIVE_TABLE: TableDefinition<String, String> = TableDefinition::new("onedrive");
 const DB_PATH: &str = "config/bt.db";
 
 const EXPIRE_TIME: u64 = 60 * 60 * 24 * 30;
@@ -88,5 +89,24 @@ impl Db {
             })?;
         }
         Ok(())
+    }
+
+    pub fn insert_refresh_token(&self, token: String) -> Result<(), Error> {
+        let write_txn = self.0.begin_write()?;
+        {
+            let mut table = write_txn.open_table(ONEDRIVE_TABLE)?;
+            table.insert("refresh_token".to_owned(), token)?;
+        }
+        write_txn.commit()?;
+        Ok(())
+    }
+
+    pub fn get_refresh_token(&self) -> Result<Option<String>, Error> {
+        let read_txn = self.0.begin_read()?;
+        let table = read_txn.open_table(ONEDRIVE_TABLE)?;
+        let token = table.get("refresh_token".to_owned())?;
+        let token = token.map(|s| s.value().to_owned());
+
+        Ok(token)
     }
 }

@@ -82,3 +82,16 @@ async fn main() {
         std::thread::sleep(std::time::Duration::from_secs(60 * 10));
     }
 }
+
+#[derive(Debug, serde::Deserialize)]
+struct OnedriveConfig {
+    client_id: String,
+    client_secret: String,
+    folder_path: String,
+}
+
+fn get_onedrive_config() -> impl upload_backend::Backend {
+    let config = std::fs::read_to_string("config/onedrive.json").ok()?;
+    let config: OnedriveConfig = serde_json::from_str(&config).ok()?;
+    Some(config)
+}
