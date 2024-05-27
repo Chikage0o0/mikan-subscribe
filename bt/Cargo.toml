@@ -12,7 +12,7 @@ url.workspace = true
 snafu.workspace = true
 bincode.workspace = true
 serde = { workspace = true, features = ["derive"] }
-upload-backend = { path = "../upload-backend" }
+upload-backend = { git = "https://github.com/Chikage0o0/upload-backend.git" }
 tokio = { workspace = true, features = ["fs", "io-util"] }
 chrono = "0.4.38"
 [dev-dependencies]

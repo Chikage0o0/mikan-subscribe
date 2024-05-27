@@ -1,5 +1,5 @@
 [workspace]
-members = ["bin", "bt", "subscribe", "upload-backend"]
+members = ["bin", "bt", "subscribe"]
 resolver = "2"
 
 [workspace.package]

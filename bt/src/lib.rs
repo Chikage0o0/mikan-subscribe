@@ -121,7 +121,7 @@ impl SessionGuard {
         let size = file.metadata().await.unwrap().len();
         let mut reader = tokio::io::BufReader::new(file);
         onedrive
-            .upload(&mut reader, size, &target_file)
+            .upload(&mut reader, size, (&target_file).into())
             .await
             .map_err(|error| Error::FinishDownload {
                 error: error.to_string(),
