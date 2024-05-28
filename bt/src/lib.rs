@@ -33,8 +33,6 @@ impl SessionGuard {
         }
 
         let mut option = SessionOptions::default();
-        option.persistence = true;
-        option.persistence_filename = Some("config/session.state".into());
 
         let session = Session::new_with_opts(DOWNLOADING_PATH.into(), option)
             .await

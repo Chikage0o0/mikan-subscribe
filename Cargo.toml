@@ -1,5 +1,5 @@
 [workspace]
-members = ["bin", "bt", "subscribe"]
+members = ["bin", "bt"]
 resolver = "2"
 
 [workspace.package]
