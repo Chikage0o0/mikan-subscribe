@@ -17,20 +17,20 @@ impl Onedrive {
         Ok(())
     }
 
-    pub fn insert_refresh_token(&self, token: String) -> Result<(), Error> {
+    pub fn insert_refresh_token(&self, token: String, name: String) -> Result<(), Error> {
         let write_txn = self.0.begin_write()?;
         {
             let mut table = write_txn.open_table(ONEDRIVE)?;
-            table.insert("refresh_token".to_owned(), token)?;
+            table.insert(name, token)?;
         }
         write_txn.commit()?;
         Ok(())
     }
 
-    pub fn get_refresh_token(&self) -> Result<Option<String>, Error> {
+    pub fn get_refresh_token(&self, name: String) -> Result<Option<String>, Error> {
         let read_txn = self.0.begin_read()?;
         let table = read_txn.open_table(ONEDRIVE)?;
-        let token = table.get("refresh_token".to_owned())?;
+        let token = table.get(name)?;
         let token = token.map(|s| s.value().to_owned());
 
         Ok(token)

@@ -6,7 +6,7 @@ use super::Db;
 
 const TABLE: TableDefinition<String, u64> = TableDefinition::new("subscribe");
 
-const EXPIRE_TIME: u64 = 60 * 60 * 24 * 30;
+const EXPIRE_TIME: u64 = 60 * 60 * 24 * 365;
 
 #[derive(Debug)]
 pub struct Subscribe(pub Arc<Db>);

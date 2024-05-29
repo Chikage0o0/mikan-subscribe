@@ -277,6 +277,7 @@ fn parse_url(url: &str) -> Result<(String, String), Error> {
 }
 
 /// 生成指定子域名的url
+/// 该函数会将url的scheme和host都设置为https和MIKANANI_DOMAIN环境变量或者mikanani.me
 fn generate_url(url: &str) -> Result<Url, Error> {
     let mut u = if !url.starts_with("http") {
         let url = format!("https://{}{}", MIKANANI_DOMAIN.to_string(), url);

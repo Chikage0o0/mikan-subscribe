@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use super::Db;
 
 const TABLE: TableDefinition<u64, Task> = TableDefinition::new("tasks");
-
+const EXPIRE_TIME: u64 = 60 * 60 * 24 * 1;
 #[derive(Debug)]
 pub struct Tasks(pub Arc<Db>);
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,13 +15,7 @@ pub struct Task {
     pub url: String,
     pub anime_title: String,
     pub air_date: NaiveDate,
-    pub status: TaskStatus,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TaskStatus {
-    Queued,
-    Downloading,
-    Downloaded,
+    pub added_at: chrono::DateTime<chrono::Utc>,
 }
 
 impl Tasks {
@@ -70,6 +64,21 @@ impl Tasks {
             result.insert(key.value().to_owned() as usize, value.value().to_owned());
         }
         Ok(result)
+    }
+
+    pub fn clear_expired(&self) -> Result<(), Error> {
+        let write_txn = self.0.begin_write()?;
+        {
+            let mut table = write_txn.open_table(TABLE)?;
+            table.retain(|_, value| {
+                let task = value;
+                let now = chrono::Utc::now();
+                let added_at = task.added_at;
+                let duration = now.signed_duration_since(added_at);
+                duration.num_seconds() < EXPIRE_TIME as i64
+            })?;
+        }
+        Ok(())
     }
 }
 

@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-const DB_PATH: &str = "config/ms.db";
+const DB_PATH: &str = "store.db";
 
 mod anime;
 mod download;
