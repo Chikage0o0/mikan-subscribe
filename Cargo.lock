@@ -292,6 +292,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
+ "once_cell",
  "redb",
  "reqwest 0.12.4",
  "rss",

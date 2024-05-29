@@ -1,11 +1,13 @@
 use chrono::NaiveDate;
+use once_cell::sync::Lazy;
 use rss::Channel;
 use snafu::{ResultExt, Snafu};
 use url::Url;
 
 use crate::store;
 
-const MIKANANI_DOMAIN: &str = "mikanani.me";
+static MIKANANI_DOMAIN: Lazy<String> =
+    Lazy::new(|| std::env::var("MIKANANI_DOMAIN").unwrap_or_else(|_| "mikanani.me".to_owned()));
 
 #[derive(Debug, Clone)]
 pub struct Subscription {
@@ -99,8 +101,10 @@ async fn get_info_from_episode_page(url: &str) -> Result<(String, Anime), Error>
 }
 
 async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
+    // 从url中解析出bangumi_id和subgroup_id
     let (bangumi_id, subgroup_id) = parse_url(url)?;
 
+    // 如果数据库中已经有该剧集的信息，则直接返回
     if let Some(anime) = store::Db::get_anime()
         .and_then(|db| db.get(&bangumi_id))
         .context(LinkDatabaseSnafu)?
@@ -122,8 +126,12 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         })?;
     let document = scraper::Html::parse_document(&content);
 
+    // 该剧集该字幕组的rss链接
     let rss = format!(
-        "https://{MIKANANI_DOMAIN}/RSS/Bangumi?bangumiId={bangumi_id}&subgroupid={subgroup_id}"
+        "https://{}/RSS/Bangumi?bangumiId={}&subgroupid={}",
+        MIKANANI_DOMAIN.to_string(),
+        bangumi_id,
+        subgroup_id
     );
     let element = document
         .select(&scraper::Selector::parse("div[class='pull-left leftbar-container']").unwrap())
@@ -133,6 +141,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
             error: "rss".into(),
         })?;
 
+    // 该剧集是周几更新
     let weekday = element
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find_map(|element| {
@@ -148,6 +157,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
             error: "weekday".into(),
         })?;
 
+    // 该剧集的名字
     let name = element
         .select(&scraper::Selector::parse("p[class='bangumi-title']").unwrap())
         .next()
@@ -158,6 +168,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         .text()
         .collect::<String>();
 
+    // 该剧集的首播日期
     let air_date = element
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find_map(|element| {
@@ -178,6 +189,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
             error: format!("air_date: {}", air_date),
         })?;
 
+    // 对应的Bangumi番组计划链接
     let bangumi_link = element
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find(|element| {
@@ -237,6 +249,7 @@ async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
     })
 }
 
+/// 从url中解析出bangumi_id和subgroup_id
 fn parse_url(url: &str) -> Result<(String, String), Error> {
     let u = generate_url(url)?;
 
@@ -263,15 +276,16 @@ fn parse_url(url: &str) -> Result<(String, String), Error> {
     Ok((bangumi_id.to_owned(), subgroup_id.to_owned()))
 }
 
+/// 生成指定子域名的url
 fn generate_url(url: &str) -> Result<Url, Error> {
     let mut u = if !url.starts_with("http") {
-        let url = format!("https://{}{}", MIKANANI_DOMAIN, url);
+        let url = format!("https://{}{}", MIKANANI_DOMAIN.to_string(), url);
         Url::parse(&url).map_err(|_| Error::ParseUrl { url })?
     } else {
         Url::parse(url).map_err(|_| Error::ParseUrl { url: url.into() })?
     };
 
-    u.set_host(Some(MIKANANI_DOMAIN))
+    u.set_host(Some(&MIKANANI_DOMAIN.to_string()))
         .map_err(|_| Error::ParseUrl { url: url.into() })?;
     u.set_scheme("https")
         .map_err(|_| Error::ParseUrl { url: url.into() })?;
