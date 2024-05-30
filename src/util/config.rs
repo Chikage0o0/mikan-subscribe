@@ -16,11 +16,21 @@ pub enum Storage {
         api_type: upload_backend::backend::OnedriveApiType,
     },
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Download {
+    pub tmp_dir: PathBuf,
+    pub upnp: bool,
+    pub download_port: u16,
+    pub threads: u16,
+    pub seed_hours: f32,
+    pub max_download_hours: f32,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub storage: Vec<Storage>,
     pub subscribe: String,
+    pub download: Download,
 }
 
 impl Settings {
@@ -51,6 +61,14 @@ mod tests {
         let settings = Settings {
             storage: vec![Storage::Local { root: "d".into() }],
             subscribe: "https://example.com".to_string(),
+            download: Download {
+                tmp_dir: "tmp".into(),
+                upnp: false,
+                download_port: 6881,
+                threads: 5,
+                seed_hours: 1.0,
+                max_download_hours: 24.0,
+            },
         };
 
         settings.save_to_file(SETTINGS).unwrap();

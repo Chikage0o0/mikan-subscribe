@@ -1,8 +1,7 @@
-mod config;
+pub mod config;
 
 use std::path::PathBuf;
 
-pub use config::Settings;
 use snafu::ResultExt;
 
 use tracing::{info, warn};

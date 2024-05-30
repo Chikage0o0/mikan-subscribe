@@ -1,11 +1,13 @@
+use librqbit::dht::Id20;
 use librqbit::{
     AddTorrent, AddTorrentOptions, AddTorrentResponse, ManagedTorrent, Session, SessionOptions,
 };
 use snafu::Snafu;
 use std::fmt::Debug;
+use std::ops::Range;
 use std::sync::{Arc, OnceLock};
 
-const DOWNLOADING_PATH: &str = "tmp";
+use crate::util::config::Download;
 
 #[derive(Clone)]
 pub struct SessionGuard(Arc<Session>);
@@ -19,14 +21,20 @@ impl Debug for SessionGuard {
 static SESSION: OnceLock<SessionGuard> = OnceLock::new();
 
 impl SessionGuard {
-    pub async fn get() -> Result<SessionGuard, Error> {
+    pub async fn get(download: Download) -> Result<SessionGuard, Error> {
         if let Some(session) = SESSION.get() {
             return Ok(session.clone());
         }
 
-        let option = SessionOptions::default();
+        let mut option = SessionOptions::default();
+        option.persistence = false;
+        option.enable_upnp_port_forwarding = download.upnp;
+        option.listen_port_range = Some(Range {
+            start: download.download_port,
+            end: download.download_port + 1,
+        });
 
-        let session = Session::new_with_opts(DOWNLOADING_PATH.into(), option)
+        let session = Session::new_with_opts(download.tmp_dir, option)
             .await
             .map_err(|error| Error::CreateSession {
                 error: error.to_string(),
@@ -64,13 +72,31 @@ impl SessionGuard {
         Ok((id, handle))
     }
 
-    pub fn delete_torrent(&self, id: usize) -> Result<(), Error> {
+    pub fn delete_torrent_by_hash(&self, info_hash: Id20) -> Result<(), Error> {
         let session = self.0.clone();
-        session
-            .delete(id, true)
-            .map_err(|error| Error::FinishDownload {
-                error: error.to_string(),
-            })?;
+
+        let id = session.with_torrents(|torrents| {
+            for (id, torrent) in torrents {
+                if torrent.info_hash() == info_hash {
+                    return Ok(id);
+                }
+            }
+            Err(Error::Delete {
+                error: format!("Torrent not found: {:?}", info_hash),
+            })
+        })?;
+        session.delete(id, true).map_err(|error| Error::Delete {
+            error: error.to_string(),
+        })?;
+
+        Ok(())
+    }
+
+    pub fn delete_torrent_by_id(&self, id: usize) -> Result<(), Error> {
+        let session = self.0.clone();
+        session.delete(id, true).map_err(|error| Error::Delete {
+            error: error.to_string(),
+        })?;
 
         Ok(())
     }
@@ -87,12 +113,6 @@ pub enum Error {
     #[snafu(display("Failed to add torrent: {}", error))]
     AddTorrent { error: String },
 
-    #[snafu(display("Failed to get session"))]
-    GetTask { error: String },
-
-    #[snafu(display("Downloading error: {}", error))]
-    Downloading { error: String },
-
-    #[snafu(display("Finish download error: {}", error))]
-    FinishDownload { error: String },
+    #[snafu(display("Failed to delete torrent: {}", error))]
+    Delete { error: String },
 }

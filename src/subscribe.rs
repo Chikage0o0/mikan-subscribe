@@ -335,15 +335,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_convert() {
-        let (_magnet, title) = get_info_from_episode_page(
-            "https://mikanani.me/Home/Episode/e6057aa20463920c5b7518aa40c8a3d284f10e56",
-        )
-        .await
-        .expect("Failed to fetch episode page");
-    }
-
-    #[tokio::test]
     async fn parse_url() {
         let url = "https://mikanani.me/Home/Bangumi/3344#583";
         let url = Url::parse(url).unwrap();

@@ -11,6 +11,9 @@ mod download;
 mod onedrive;
 mod subscribe;
 
+pub use download::Task as DownloadTask;
+pub use download::TaskState as DownloadTaskState;
+
 static DB: OnceLock<Arc<Db>> = OnceLock::new();
 static SUBSCRIBE: OnceLock<Arc<subscribe::Subscribe>> = OnceLock::new();
 static DOWNLOAD: OnceLock<Arc<download::Tasks>> = OnceLock::new();
