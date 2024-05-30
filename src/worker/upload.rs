@@ -97,6 +97,8 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                     _ => unreachable!(),
                 }
             }
+
+            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
         }
     })
 }
