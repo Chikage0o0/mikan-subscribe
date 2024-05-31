@@ -3,7 +3,8 @@ FROM rust:alpine as builder
 WORKDIR /build
 # ENV TARGET_CC=x86_64-linux-musl-gcc
 
-RUN apk add --no-cache musl-dev musl-utils musl-dev gcc clang llvm-dev openssl-dev  gcompat
+RUN apk add --no-cache musl-dev musl-utils musl-dev gcc clang18-dev openssl-dev  g++ llvm18-dev
+
 
 COPY . .
 RUN cargo build --release
