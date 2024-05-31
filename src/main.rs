@@ -5,6 +5,7 @@ mod util;
 mod worker;
 
 use subscribe::get_feed;
+use tokio::signal;
 use tracing::{debug, error};
 use tracing::{info, Level};
 use tracing_subscriber::filter::FilterFn;
@@ -22,7 +23,7 @@ async fn main() {
     let filtered_layer = fmt::layer()
         .with_filter(FilterFn::new(|metadata| metadata.level() < &Level::DEBUG))
         .with_filter(FilterFn::new(|metadata| {
-            !metadata.target().starts_with("librqbit")
+            !metadata.target().starts_with("librqbit") && !metadata.target().starts_with("llama")
         }));
     tracing_subscriber::registry().with(filtered_layer).init();
 
@@ -83,6 +84,26 @@ async fn main() {
         }
     });
 
-    tokio::signal::ctrl_c().await.unwrap();
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
     info!("Service stopped");
 }
