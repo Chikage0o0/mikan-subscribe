@@ -116,6 +116,7 @@ pub struct DownloadHandle {
 
 impl DownloadHandle {
     pub async fn add(&self, name: String, sub: Subscription) -> Result<(), Error> {
+        let bangume_id = sub.anime.bangumi_tv_id;
         let db = store::Db::get_download().context(DbSnafu)?;
         db.insert(
             name.clone(),
@@ -125,6 +126,7 @@ impl DownloadHandle {
                 air_date: sub.anime.air_date.clone(),
                 weekday: sub.anime.weekday.clone(),
                 state: store::DownloadTaskState::Pending,
+                bangumi_id: bangume_id,
                 added_at: chrono::Utc::now().timestamp() as u64,
             },
         )
@@ -142,7 +144,7 @@ impl DownloadHandle {
                 air_date: task.air_date,
                 weekday: task.weekday,
                 rss: "".to_owned(),
-                bangumi_link: "".to_owned(),
+                bangumi_tv_id: task.bangumi_id,
             },
         };
         self.add(name, sub).await

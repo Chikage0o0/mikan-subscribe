@@ -6,7 +6,7 @@ use rss::Channel;
 use snafu::{ResultExt, Snafu};
 use url::Url;
 
-use crate::store;
+use crate::{store, util::reqwest::client};
 
 static MIKANANI_DOMAIN: Lazy<String> =
     Lazy::new(|| std::env::var("MIKANANI_DOMAIN").unwrap_or_else(|_| "mikanani.me".to_owned()));
@@ -22,14 +22,16 @@ pub struct Anime {
     pub weekday: String,
     pub name: String,
     pub air_date: NaiveDate,
-    pub bangumi_link: String,
+    pub bangumi_tv_id: u64,
 }
 
 // Fetch feed from the mikanani.me rss feed
 pub async fn get_feed(url: &str) -> Result<HashMap<String, Subscription>, Error> {
     let u = generate_url(url)?;
 
-    let content = reqwest::get(u.to_string())
+    let content = client()
+        .get(u.to_string())
+        .send()
         .await
         .context(FetchFeedSnafu)?
         .bytes()
@@ -59,7 +61,9 @@ pub async fn get_feed(url: &str) -> Result<HashMap<String, Subscription>, Error>
 async fn get_info_from_episode_page(url: &str) -> Result<(String, Anime, bool), Error> {
     let u = generate_url(url)?;
 
-    let content = reqwest::get(u.to_string())
+    let content = client()
+        .get(u.to_string())
+        .send()
         .await
         .with_context(|_| FetchEpisodePageSnafu {
             url: url.to_owned(),
@@ -117,7 +121,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
 
     // 如果数据库中已经有该剧集的信息，则直接返回
     if let Some(anime) = store::Db::get_anime()
-        .and_then(|db| db.get(&bangumi_id))
+        .and_then(|db| db.get(bangumi_id))
         .context(LinkDatabaseSnafu)?
     {
         return Ok((anime, false));
@@ -125,7 +129,9 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
 
     let u = generate_url(url)?;
 
-    let content = reqwest::get(u.to_string())
+    let content = client()
+        .get(u.to_string())
+        .send()
         .await
         .with_context(|_| FetchEpisodePageSnafu {
             url: url.to_owned(),
@@ -203,7 +209,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
         })?;
 
     // 对应的Bangumi番组计划链接
-    let bangumi_link = element
+    let bangumi_tv_id = element
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find(|element| {
             let text = element.text().collect::<String>();
@@ -222,18 +228,22 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
             error: "bangumi_link".into(),
         })?
         .trim()
-        .to_owned();
+        .split('/')
+        .last()
+        .unwrap()
+        .parse()
+        .unwrap();
 
     let anime = Anime {
         rss,
         weekday,
         name,
         air_date,
-        bangumi_link,
+        bangumi_tv_id,
     };
 
     store::Db::get_anime()
-        .and_then(|db| db.insert(&bangumi_id, anime.clone()))
+        .and_then(|db| db.insert(bangumi_id, anime.clone()))
         .context(LinkDatabaseSnafu)?;
 
     Ok((anime, true))
@@ -270,7 +280,7 @@ async fn convert(item: &rss::Item) -> Result<(String, Subscription, bool), Error
 }
 
 /// 从url中解析出bangumi_id和subgroup_id
-fn parse_url(url: &str) -> Result<(String, String), Error> {
+fn parse_url(url: &str) -> Result<(u64, u64), Error> {
     let u = generate_url(url)?;
 
     let bangumi_id = u
@@ -293,7 +303,7 @@ fn parse_url(url: &str) -> Result<(String, String), Error> {
         });
     }
 
-    Ok((bangumi_id.to_owned(), subgroup_id.to_owned()))
+    Ok((bangumi_id.parse().unwrap(), subgroup_id.parse().unwrap()))
 }
 
 /// 生成指定子域名的url
@@ -344,10 +354,14 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
+    use crate::util::{self, reqwest::init_client};
+
     use super::*;
 
     #[tokio::test]
     async fn test_get_feed() {
+        let settings = util::config::Settings::load_from_file("settings.json").unwrap();
+        let _ = init_client(settings.proxy).unwrap();
         let sub = get_feed("https://mikanani.me/RSS/MyBangumi?token=7eyqLval7M7aHnZ08QNtMAVbg%2fipV4sY5pAYcasKRBI%3d")
             .await
             .unwrap();

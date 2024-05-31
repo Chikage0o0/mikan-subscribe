@@ -31,6 +31,8 @@ pub struct Settings {
     pub storage: Vec<Storage>,
     pub subscribe: String,
     pub download: Download,
+    pub proxy: Option<String>,
+    pub llama_model: Option<PathBuf>,
 }
 
 impl Settings {
@@ -69,6 +71,8 @@ mod tests {
                 seed_hours: 1.0,
                 max_download_hours: 24.0,
             },
+            proxy: None,
+            llama_model: None,
         };
 
         settings.save_to_file(SETTINGS).unwrap();

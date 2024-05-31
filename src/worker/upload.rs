@@ -8,6 +8,8 @@ use tracing::info;
 use crate::store::Db;
 use crate::util::config::Storage;
 use crate::util::convert_storage;
+use crate::util::llama;
+use crate::util::reqwest::client;
 
 pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
     let backend = convert_storage(storages).await.unwrap();
@@ -54,12 +56,8 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                         }
                         let video_path = video_path.unwrap();
 
-                        let video_name = video_path
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_string();
+                        let bangumi_id = task.bangumi_id;
+                        let video_name = generate_file_name(&video_path, bangumi_id).await;
                         let upload_path = Path::new(generate_folder_name(task.air_date).as_str())
                             .join(task.weekday)
                             .join(task.anime_title)
@@ -160,4 +158,109 @@ async fn find_video_in_path(path: &Path) -> Option<PathBuf> {
         }
     }
     None
+}
+
+async fn generate_file_name(path: &Path, bangumi_id: u64) -> String {
+    if let Some(l) = llama::Llama::get() {
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
+        let file_name_clone = file_name.clone();
+        let ext = path.extension().unwrap().to_str().unwrap().to_string();
+        let blocking_spawn = tokio::task::spawn_blocking(move || l.decode(&file_name_clone));
+        let ret = blocking_spawn.await.unwrap();
+        match ret {
+            Ok(ret) => {
+                let episode = ret.episode;
+
+                let client = client()
+                    .get(format!(
+                        "https://api.bgm.tv/v0/episodes?subject_id={}&type=0&limit=1000",
+                        bangumi_id
+                    ))
+                    .header("User-Agent", "Chikage0o0/mikan-subscriber")
+                    .send()
+                    .await;
+                match client {
+                    Ok(client) => {
+                        let client = client.json::<BangumiEpisode>().await;
+                        if let Ok(client) = client {
+                            for i in client.data {
+                                if i.ep == episode || i.sort == episode {
+                                    if i.name_cn.is_empty() {
+                                        return format!(
+                                            "{:02} - {}.{}",
+                                            episode,
+                                            sanitize_filename(&i.name),
+                                            ext
+                                        );
+                                    } else {
+                                        return format!(
+                                            "{:02} - {}.{}",
+                                            episode,
+                                            sanitize_filename(&i.name_cn),
+                                            ext
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Error when get_name_from_bangumi: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("Error decoding {}: {}", file_name, e);
+            }
+        }
+    }
+
+    path.file_name().unwrap().to_str().unwrap().to_string()
+}
+
+fn sanitize_filename(filename: &str) -> String {
+    // Define a set of special characters to be replaced
+    let special_chars = ['\\', '/', ':', '*', '?', '"', '<', '>', '|'];
+
+    // Replace each special character with an underscore
+    filename
+        .chars()
+        .map(|c| if special_chars.contains(&c) { '_' } else { c })
+        .collect()
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct BangumiEpisode {
+    pub data: Vec<Episode>,
+}
+#[derive(Debug, serde::Deserialize)]
+struct Episode {
+    name: String,
+    name_cn: String,
+    sort: u32,
+    ep: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::util::{self, llama, reqwest::init_client};
+
+    #[tokio::test]
+    async fn test_generate_file_name() {
+        let settings = util::config::Settings::load_from_file("settings.json").unwrap();
+        let _ = init_client(settings.proxy).unwrap();
+        if let Some(llama) = settings.llama_model {
+            let blocking_spawn = tokio::task::spawn_blocking(move || llama::Llama::init(&llama));
+            if let Err(e) = blocking_spawn.await.unwrap() {
+                eprintln!("Error loading llama model: {}", e);
+            }
+        }
+        let path = std::path::Path::new(
+            "[Up to 21°C] Henjin no Salad Bowl - 09 (CR 1920x1080 AVC AAC MKV) [37D7B6CE].mkv",
+        );
+        let bangumi_id = 444403;
+        let file_name = super::generate_file_name(path, bangumi_id).await;
+
+        println!("{}", file_name);
+    }
 }

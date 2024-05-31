@@ -9,7 +9,7 @@ use super::Db;
 #[derive(Debug)]
 pub struct Anime(pub Arc<Db>);
 
-const ANIME: TableDefinition<String, subscribe::Anime> = TableDefinition::new("anime");
+const ANIME: TableDefinition<u64, subscribe::Anime> = TableDefinition::new("anime");
 
 impl Anime {
     pub(super) fn init(&self) -> Result<(), Error> {
@@ -19,20 +19,20 @@ impl Anime {
         Ok(())
     }
 
-    pub fn insert(&self, id: &str, anime: subscribe::Anime) -> Result<(), Error> {
+    pub fn insert(&self, id: u64, anime: subscribe::Anime) -> Result<(), Error> {
         let write_txn = self.0.begin_write()?;
         {
             let mut table = write_txn.open_table(ANIME)?;
-            table.insert(id.to_string(), anime)?;
+            table.insert(id, anime)?;
         }
         write_txn.commit()?;
         Ok(())
     }
 
-    pub fn get(&self, id: &str) -> Result<Option<subscribe::Anime>, Error> {
+    pub fn get(&self, id: u64) -> Result<Option<subscribe::Anime>, Error> {
         let read_txn = self.0.begin_read()?;
         let table = read_txn.open_table(ANIME)?;
-        let anime = table.get(id.to_string())?;
+        let anime = table.get(id)?;
         let anime = anime.map(|s| s.value().to_owned());
 
         Ok(anime)

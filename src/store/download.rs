@@ -18,6 +18,7 @@ pub struct Task {
     pub air_date: NaiveDate,
     pub added_at: u64,
     pub state: TaskState,
+    pub bangumi_id: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

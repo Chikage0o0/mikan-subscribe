@@ -13,6 +13,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::Layer;
 
+use util::llama;
+use util::reqwest::init_client;
 use worker::DownloadHandle;
 
 #[tokio::main]
@@ -25,6 +27,13 @@ async fn main() {
     tracing_subscriber::registry().with(filtered_layer).init();
 
     let settings = util::config::Settings::load_from_file("settings.json").unwrap();
+    let _ = init_client(settings.proxy).unwrap();
+    if let Some(llama) = settings.llama_model {
+        let blocking_spawn = tokio::task::spawn_blocking(move || llama::Llama::init(&llama));
+        if let Err(e) = blocking_spawn.await.unwrap() {
+            error!("Error loading llama model: {}", e);
+        }
+    }
 
     let _upload_worker = worker::upload_video(settings.storage).await;
     let download_worker = DownloadHandle::init(settings.download).await.unwrap();
