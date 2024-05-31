@@ -37,15 +37,6 @@ impl Anime {
 
         Ok(anime)
     }
-
-    pub fn delete(&self, id: &str) -> Result<(), Error> {
-        let write_txn = self.0.begin_write()?;
-        {
-            let mut table = write_txn.open_table(ANIME)?;
-            table.remove(id.to_string())?;
-        }
-        Ok(())
-    }
 }
 
 impl Value for subscribe::Anime {

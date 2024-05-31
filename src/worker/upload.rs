@@ -3,6 +3,7 @@ use chrono::NaiveDate;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncSeekExt as _;
 use tokio::task::JoinHandle;
+use tracing::info;
 
 use crate::store::Db;
 use crate::util::config::Storage;
@@ -13,6 +14,8 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
     let download_db = Db::get_download().unwrap();
 
     tokio::spawn(async move {
+        // sleep 随机时间，避免同时清理
+        tokio::time::sleep(tokio::time::Duration::from_secs(rand::random::<u64>() % 60)).await;
         loop {
             // 获取下载完成的任务，但是还没有上传的
             let ret = download_db.get_with_state(|state| match state {
@@ -93,12 +96,14 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                             .unwrap_or_else(|e| {
                                 tracing::error!("Error updating state: {}", e);
                             });
+
+                        info!("Uploaded: {}", name);
                     }
                     _ => unreachable!(),
                 }
             }
 
-            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         }
     })
 }

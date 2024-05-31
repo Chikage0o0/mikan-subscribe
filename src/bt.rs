@@ -116,3 +116,24 @@ pub enum Error {
     #[snafu(display("Failed to delete torrent: {}", error))]
     Delete { error: String },
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{bt::SessionGuard, util};
+
+    // test delete_torrent_by_hash
+    #[tokio::test]
+    async fn test_delete_torrent_by_hash() {
+        let settings = util::config::Settings::load_from_file("settings.json").unwrap();
+        let session = SessionGuard::get(settings.download).await.unwrap();
+        let info_hash = session
+            .add_torrent("magnet:?xt=urn:btih:5d9140ed25be2cff3b981566792b668ab6976f58&tr=http%3a%2f%2ft.nyaatracker.com%2fannounce&tr=http%3a%2f%2ftracker.kamigami.org%3a2710%2fannounce&tr=http%3a%2f%2fshare.camoe.cn%3a8080%2fannounce&tr=http%3a%2f%2fopentracker.acgnx.se%2fannounce&tr=http%3a%2f%2fanidex.moe%3a6969%2fannounce&tr=http%3a%2f%2ft.acg.rip%3a6699%2fannounce&tr=https%3a%2f%2ftr.bangumi.moe%3a9696%2fannounce&tr=udp%3a%2f%2ftr.bangumi.moe%3a6969%2fannounce&tr=http%3a%2f%2fopen.acgtracker.com%3a1096%2fannounce&tr=udp%3a%2f%2ftracker.opentrackr.org%3a1337%2fannounce")
+            .await
+            .unwrap()
+            .1
+            .info_hash().as_string();
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        let result = session.delete_torrent_by_hash(info_hash.parse().unwrap());
+        assert!(result.is_ok());
+    }
+}

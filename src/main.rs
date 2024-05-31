@@ -26,7 +26,7 @@ async fn main() {
 
     let settings = util::config::Settings::load_from_file("settings.json").unwrap();
 
-    let upload_worker = worker::upload_video(settings.storage).await;
+    let _upload_worker = worker::upload_video(settings.storage).await;
     let download_worker = DownloadHandle::init(settings.download).await.unwrap();
 
     info!("Service started");
@@ -45,20 +45,22 @@ async fn main() {
             }
             let feed = feed.unwrap();
 
-            for item in feed {
-                match db.get(item.name.clone()) {
+            for (name, item) in feed {
+                match db.get(name.clone()) {
                     Ok(Some(_)) => {
-                        debug!("Already processed {}", item.name);
+                        debug!("Already in processed {}", name);
                     }
                     Ok(None) => {
-                        debug!("Processing {}", item.name);
-                        let ret = download_worker_cloned.add(item.clone()).await;
+                        debug!("Processing {}", name);
+                        let ret = download_worker_cloned
+                            .add(name.to_owned(), item.clone())
+                            .await;
                         if let Err(e) = ret {
                             error!("Error adding download task: {}", e);
                         }
 
                         // Insert into database to avoid duplicate processing
-                        db.insert(item.name.clone()).unwrap_or_else(|e| {
+                        db.insert(name.clone()).unwrap_or_else(|e| {
                             error!("Error inserting into database: {}", e);
                         });
                     }
@@ -74,6 +76,4 @@ async fn main() {
 
     tokio::signal::ctrl_c().await.unwrap();
     info!("Service stopped");
-
-    info!("Waiting for upload worker to finish");
 }

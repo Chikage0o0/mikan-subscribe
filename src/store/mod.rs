@@ -8,6 +8,7 @@ const DB_PATH: &str = "store.db";
 
 mod anime;
 mod download;
+mod episode;
 mod onedrive;
 mod subscribe;
 
@@ -19,6 +20,7 @@ static SUBSCRIBE: OnceLock<Arc<subscribe::Subscribe>> = OnceLock::new();
 static DOWNLOAD: OnceLock<Arc<download::Tasks>> = OnceLock::new();
 static ONEDRIVE: OnceLock<Arc<onedrive::Onedrive>> = OnceLock::new();
 static ANIME: OnceLock<Arc<anime::Anime>> = OnceLock::new();
+static EPISODE: OnceLock<Arc<episode::Episode>> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Db(redb::Database);
@@ -79,6 +81,18 @@ impl Db {
             anime.init()?;
             ANIME.set(anime.clone()).unwrap();
             Ok(anime)
+        }
+    }
+
+    pub fn get_episode() -> Result<Arc<episode::Episode>, Error> {
+        if let Some(episode) = EPISODE.get() {
+            Ok(episode.clone())
+        } else {
+            let db = Self::db()?;
+            let episode = Arc::new(episode::Episode(db));
+            episode.init()?;
+            EPISODE.set(episode.clone()).unwrap();
+            Ok(episode)
         }
     }
 }

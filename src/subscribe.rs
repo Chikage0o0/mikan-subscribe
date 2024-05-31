@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::NaiveDate;
 use once_cell::sync::Lazy;
 use rss::Channel;
@@ -9,11 +11,10 @@ use crate::store;
 static MIKANANI_DOMAIN: Lazy<String> =
     Lazy::new(|| std::env::var("MIKANANI_DOMAIN").unwrap_or_else(|_| "mikanani.me".to_owned()));
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Subscription {
     pub magnet: String,
     pub anime: Anime,
-    pub name: String,
 }
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Anime {
@@ -25,7 +26,7 @@ pub struct Anime {
 }
 
 // Fetch feed from the mikanani.me rss feed
-pub async fn get_feed(url: &str) -> Result<Vec<Subscription>, Error> {
+pub async fn get_feed(url: &str) -> Result<HashMap<String, Subscription>, Error> {
     let u = generate_url(url)?;
 
     let content = reqwest::get(u.to_string())
@@ -36,16 +37,26 @@ pub async fn get_feed(url: &str) -> Result<Vec<Subscription>, Error> {
         .context(FetchFeedSnafu)?;
     let channel = Channel::read_from(&content[..]).context(ReadFeedSnafu)?;
 
-    let mut subscriptions = Vec::new();
+    let mut subscriptions = HashMap::new();
     for item in channel.items {
-        let subscription = convert(&item).await?;
-        subscriptions.push(subscription);
+        let (name, subscription, flag) = convert(&item).await?;
+
+        // 如果是新的动画，那么获取该动画的所有剧集
+        if flag {
+            let episodes = Box::pin(get_feed(&subscription.anime.rss)).await?;
+            for (name, subscription) in episodes {
+                subscriptions.insert(name, subscription);
+            }
+        }
+
+        subscriptions.insert(name, subscription);
     }
 
     Ok(subscriptions)
 }
 
-async fn get_info_from_episode_page(url: &str) -> Result<(String, Anime), Error> {
+// 最后一个bool值表示是否是新的动画
+async fn get_info_from_episode_page(url: &str) -> Result<(String, Anime, bool), Error> {
     let u = generate_url(url)?;
 
     let content = reqwest::get(u.to_string())
@@ -95,12 +106,12 @@ async fn get_info_from_episode_page(url: &str) -> Result<(String, Anime), Error>
             url: url.to_owned(),
         })?;
 
-    let anime = get_info_from_anime_page(&anime_url).await?;
+    let (anime, flag) = get_info_from_anime_page(&anime_url).await?;
 
-    Ok((magnet, anime))
+    Ok((magnet, anime, flag))
 }
 
-async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
+async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
     // 从url中解析出bangumi_id和subgroup_id
     let (bangumi_id, subgroup_id) = parse_url(url)?;
 
@@ -109,7 +120,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         .and_then(|db| db.get(&bangumi_id))
         .context(LinkDatabaseSnafu)?
     {
-        return Ok(anime);
+        return Ok((anime, false));
     }
 
     let u = generate_url(url)?;
@@ -147,7 +158,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         .find_map(|element| {
             let text = element.text().collect::<String>();
             if let Some(weekday) = text.strip_prefix("放送日期：") {
-                Some(weekday.to_owned())
+                Some(weekday.trim().to_owned())
             } else {
                 None
             }
@@ -166,7 +177,9 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
             error: "name".into(),
         })?
         .text()
-        .collect::<String>();
+        .collect::<String>()
+        .trim()
+        .to_owned();
 
     // 该剧集的首播日期
     let air_date = element
@@ -174,7 +187,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         .find_map(|element| {
             let text = element.text().collect::<String>();
             if let Some(air_date) = text.strip_prefix("放送开始：") {
-                Some(air_date.to_owned())
+                Some(air_date.trim().to_owned())
             } else {
                 None
             }
@@ -208,6 +221,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
             url: url.to_owned(),
             error: "bangumi_link".into(),
         })?
+        .trim()
         .to_owned();
 
     let anime = Anime {
@@ -222,10 +236,10 @@ async fn get_info_from_anime_page(url: &str) -> Result<Anime, Error> {
         .and_then(|db| db.insert(&bangumi_id, anime.clone()))
         .context(LinkDatabaseSnafu)?;
 
-    Ok(anime)
+    Ok((anime, true))
 }
 
-async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
+async fn convert(item: &rss::Item) -> Result<(String, Subscription, bool), Error> {
     let link = item.link.as_ref().ok_or(Error::ConvertFeed {
         item: item.clone(),
         entity: "link".into(),
@@ -240,13 +254,19 @@ async fn convert(item: &rss::Item) -> Result<Subscription, Error> {
         })?
         .to_string();
 
-    let (magnet, title) = get_info_from_episode_page(link).await?;
+    // 如果数据库中已经有该剧集的信息，则直接返回
+    let db = store::Db::get_episode().context(LinkDatabaseSnafu)?;
+    if let Some(subscription) = db.get(&name).context(LinkDatabaseSnafu)? {
+        return Ok((name, subscription, false));
+    }
 
-    Ok(Subscription {
-        magnet,
-        name,
-        anime: title,
-    })
+    // 获取该剧集的磁力链接和动画信息, 并将其存入数据库
+    let (magnet, anime, flag) = get_info_from_episode_page(link).await?;
+    let subscription = Subscription { magnet, anime };
+    db.insert(&name, subscription.clone())
+        .context(LinkDatabaseSnafu)?;
+
+    Ok((name, subscription, flag))
 }
 
 /// 从url中解析出bangumi_id和subgroup_id

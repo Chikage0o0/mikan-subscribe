@@ -80,12 +80,13 @@ impl Tasks {
         Ok(task)
     }
 
-    pub fn delete(&self, name: String) -> Result<(), Error> {
+    pub fn delete(&self, name: &str) -> Result<(), Error> {
         let write_txn = self.0.begin_write()?;
         {
             let mut table = write_txn.open_table(TABLE)?;
-            table.remove(name)?;
+            table.remove(name.to_string())?;
         }
+        write_txn.commit()?;
         Ok(())
     }
 
@@ -111,7 +112,7 @@ impl Value for Task {
     type SelfType<'a> =  Self
     where
         Self: 'a;
-    type AsBytes<'a> = String
+    type AsBytes<'a> = Vec<u8>
     where
         Self: 'a;
 
@@ -124,7 +125,7 @@ impl Value for Task {
         Self: 'a,
         Self: 'b,
     {
-        serde_json::to_string(value).unwrap()
+        bincode::serialize(value).unwrap()
     }
 
     fn type_name() -> redb::TypeName {
@@ -135,6 +136,6 @@ impl Value for Task {
     where
         Self: 'a,
     {
-        serde_json::from_slice(data).unwrap()
+        bincode::deserialize(data).unwrap()
     }
 }

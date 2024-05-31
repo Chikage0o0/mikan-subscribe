@@ -18,15 +18,17 @@ impl Subscribe {
         write_txn.commit()?;
 
         tokio::spawn(async move {
+            // sleep 随机时间，避免同时清理
+            tokio::time::sleep(tokio::time::Duration::from_secs(rand::random::<u64>() % 60)).await;
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 24)).await;
-
                 Db::get_subscribe()
                     .unwrap()
                     .clear_expire()
                     .unwrap_or_else(|e| {
                         tracing::error!("Error clearing expired subscribe: {}", e);
                     });
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(60 * 60 * 24)).await;
             }
         });
 
@@ -54,16 +56,6 @@ impl Subscribe {
         let timestamp = timestamp.map(|s| s.value().to_owned());
 
         Ok(timestamp)
-    }
-
-    #[allow(dead_code)]
-    pub fn delete(&self, name: String) -> Result<(), Error> {
-        let write_txn = self.0.begin_write()?;
-        {
-            let mut table = write_txn.open_table(TABLE)?;
-            table.remove(name)?;
-        }
-        Ok(())
     }
 
     pub fn clear_expire(&self) -> Result<(), Error> {
