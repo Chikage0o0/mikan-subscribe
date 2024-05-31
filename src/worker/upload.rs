@@ -20,9 +20,8 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
         tokio::time::sleep(tokio::time::Duration::from_secs(rand::random::<u64>() % 60)).await;
         loop {
             // 获取下载完成的任务，但是还没有上传的
-            let ret = download_db.get_with_state(|state| match state {
-                crate::store::DownloadTaskState::Downloaded { .. } => true,
-                _ => false,
+            let ret = download_db.get_with_state(|state| {
+                matches!(state, crate::store::DownloadTaskState::Downloaded { .. })
             });
             if let Err(e) = ret {
                 tracing::error!("Error getting download tasks: {}", e);
@@ -149,11 +148,9 @@ async fn find_video_in_path(path: &Path) -> Option<PathBuf> {
             if ret.is_some() {
                 return ret;
             }
-        } else {
-            if let Some(ext) = path.extension() {
-                if ext == "mp4" || ext == "mkv" {
-                    return Some(path);
-                }
+        } else if let Some(ext) = path.extension() {
+            if ext == "mp4" || ext == "mkv" {
+                return Some(path);
             }
         }
     }

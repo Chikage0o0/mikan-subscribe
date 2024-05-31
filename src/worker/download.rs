@@ -123,7 +123,7 @@ impl DownloadHandle {
             DownloadTask {
                 url: sub.magnet.clone(),
                 anime_title: sub.anime.name.clone(),
-                air_date: sub.anime.air_date.clone(),
+                air_date: sub.anime.air_date,
                 weekday: sub.anime.weekday.clone(),
                 state: store::DownloadTaskState::Pending,
                 bangumi_id: bangume_id,
@@ -131,7 +131,12 @@ impl DownloadHandle {
             },
         )
         .context(DbSnafu)?;
-        self.tx.send_async((name, sub)).await.context(SendSnafu)?;
+        self.tx
+            .send_async((name, sub))
+            .await
+            .map_err(|e| Error::Send {
+                message: e.to_string(),
+            })?;
 
         Ok(())
     }
@@ -156,9 +161,11 @@ impl DownloadHandle {
         let db = store::Db::get_download().context(DbSnafu)?;
 
         let ret = db
-            .get_with_state(|state| match state {
-                store::DownloadTaskState::Pending | store::DownloadTaskState::Downloading => true,
-                _ => false,
+            .get_with_state(|state| {
+                matches!(
+                    state,
+                    store::DownloadTaskState::Pending | store::DownloadTaskState::Downloading
+                )
             })
             .context(DbSnafu)?;
 
@@ -202,10 +209,7 @@ impl DownloadHandle {
     fn delete_finished(&self) -> Result<(), Error> {
         let db = store::Db::get_download().context(DbSnafu)?;
         let ret = db
-            .get_with_state(|state| match state {
-                store::DownloadTaskState::Finished { .. } => true,
-                _ => false,
-            })
+            .get_with_state(|state| matches!(state, store::DownloadTaskState::Finished { .. }))
             .context(DbSnafu)?;
 
         for (name, task) in ret {
@@ -260,13 +264,11 @@ impl DownloadHandle {
 #[derive(Debug, Snafu)]
 pub enum Error {
     #[snafu(display("Error executing download task: {}", source))]
-    SessionError { source: bt::Error },
+    Session { source: bt::Error },
 
     #[snafu(display("Error connecting to database: {}", source))]
-    DbError { source: redb::Error },
+    Db { source: redb::Error },
 
-    #[snafu(display("Error sending subscription: {}", source))]
-    Send {
-        source: flume::SendError<(String, Subscription)>,
-    },
+    #[snafu(display("Error sending subscription: {}", message))]
+    Send { message: String },
 }

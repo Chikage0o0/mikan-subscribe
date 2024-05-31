@@ -146,9 +146,7 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
     // 该剧集该字幕组的rss链接
     let rss = format!(
         "https://{}/RSS/Bangumi?bangumiId={}&subgroupid={}",
-        MIKANANI_DOMAIN.to_string(),
-        bangumi_id,
-        subgroup_id
+        *MIKANANI_DOMAIN, bangumi_id, subgroup_id
     );
     let element = document
         .select(&scraper::Selector::parse("div[class='pull-left leftbar-container']").unwrap())
@@ -163,11 +161,8 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find_map(|element| {
             let text = element.text().collect::<String>();
-            if let Some(weekday) = text.strip_prefix("放送日期：") {
-                Some(weekday.trim().to_owned())
-            } else {
-                None
-            }
+            text.strip_prefix("放送日期：")
+                .map(|weekday| weekday.trim().to_owned())
         })
         .ok_or(Error::ParseAnimePage {
             url: url.to_owned(),
@@ -192,11 +187,8 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
         .select(&scraper::Selector::parse("p[class='bangumi-info']").unwrap())
         .find_map(|element| {
             let text = element.text().collect::<String>();
-            if let Some(air_date) = text.strip_prefix("放送开始：") {
-                Some(air_date.trim().to_owned())
-            } else {
-                None
-            }
+            text.strip_prefix("放送开始：")
+                .map(|air_date| air_date.trim().to_owned())
         })
         .ok_or(Error::ParseAnimePage {
             url: url.to_owned(),
@@ -215,13 +207,12 @@ async fn get_info_from_anime_page(url: &str) -> Result<(Anime, bool), Error> {
             let text = element.text().collect::<String>();
             text.contains("Bangumi番组计划链接：")
         })
-        .map(|element| {
+        .and_then(|element| {
             element
                 .select(&scraper::Selector::parse("a[class='w-other-c']").unwrap())
                 .next()
                 .map(|element| element.value().attr("href").to_owned())
         })
-        .flatten()
         .flatten()
         .ok_or(Error::ParseAnimePage {
             url: url.to_owned(),
@@ -310,7 +301,7 @@ fn parse_url(url: &str) -> Result<(u64, u64), Error> {
 /// 该函数会将url的scheme和host都设置为https和MIKANANI_DOMAIN环境变量或者mikanani.me
 fn generate_url(url: &str) -> Result<Url, Error> {
     let mut u = if !url.starts_with("http") {
-        let url = format!("https://{}{}", MIKANANI_DOMAIN.to_string(), url);
+        let url = format!("https://{}{}", *MIKANANI_DOMAIN, url);
         Url::parse(&url).map_err(|_| Error::ParseUrl { url })?
     } else {
         Url::parse(url).map_err(|_| Error::ParseUrl { url: url.into() })?

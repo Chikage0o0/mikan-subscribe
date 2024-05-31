@@ -26,12 +26,12 @@ static EPISODE: OnceLock<Arc<episode::Episode>> = OnceLock::new();
 pub struct Db(redb::Database);
 
 impl Db {
-    pub fn db() -> Result<Arc<Self>, Error> {
+    pub fn get_db() -> Result<Arc<Self>, Error> {
         if let Some(db) = DB.get() {
             return Ok(db.clone());
         }
-        let db = redb::Database::create(DB_PATH)?;
-        let db = Arc::new(Self(db));
+        let db = Arc::new(Self(redb::Database::create(DB_PATH)?));
+
         DB.set(db.clone()).unwrap();
         Ok(db)
     }
@@ -40,7 +40,7 @@ impl Db {
         if let Some(subscribe) = SUBSCRIBE.get() {
             Ok(subscribe.clone())
         } else {
-            let db = Self::db()?;
+            let db = Self::get_db()?;
             let subscribe = Arc::new(subscribe::Subscribe(db));
             subscribe.init()?;
             SUBSCRIBE.set(subscribe.clone()).unwrap();
@@ -52,7 +52,7 @@ impl Db {
         if let Some(download) = DOWNLOAD.get() {
             Ok(download.clone())
         } else {
-            let db = Self::db()?;
+            let db = Self::get_db()?;
             let download = Arc::new(download::Tasks(db));
             download.init()?;
             DOWNLOAD.set(download.clone()).unwrap();
@@ -64,7 +64,7 @@ impl Db {
         if let Some(onedrive) = ONEDRIVE.get() {
             Ok(onedrive.clone())
         } else {
-            let db = Self::db()?;
+            let db = Self::get_db()?;
             let onedrive = Arc::new(onedrive::Onedrive(db));
             onedrive.init()?;
             ONEDRIVE.set(onedrive.clone()).unwrap();
@@ -76,7 +76,7 @@ impl Db {
         if let Some(anime) = ANIME.get() {
             Ok(anime.clone())
         } else {
-            let db = Self::db()?;
+            let db = Self::get_db()?;
             let anime = Arc::new(anime::Anime(db));
             anime.init()?;
             ANIME.set(anime.clone()).unwrap();
@@ -88,7 +88,7 @@ impl Db {
         if let Some(episode) = EPISODE.get() {
             Ok(episode.clone())
         } else {
-            let db = Self::db()?;
+            let db = Self::get_db()?;
             let episode = Arc::new(episode::Episode(db));
             episode.init()?;
             EPISODE.set(episode.clone()).unwrap();

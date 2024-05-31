@@ -26,13 +26,15 @@ impl SessionGuard {
             return Ok(session.clone());
         }
 
-        let mut option = SessionOptions::default();
-        option.persistence = false;
-        option.enable_upnp_port_forwarding = download.upnp;
-        option.listen_port_range = Some(Range {
-            start: download.download_port,
-            end: download.download_port + 1,
-        });
+        let option = SessionOptions {
+            persistence: false,
+            enable_upnp_port_forwarding: download.upnp,
+            listen_port_range: Some(Range {
+                start: download.download_port,
+                end: download.download_port + 1,
+            }),
+            ..Default::default()
+        };
 
         let session = Session::new_with_opts(download.tmp_dir, option)
             .await

@@ -114,11 +114,11 @@ async fn login_onedrive(
 #[derive(Debug, snafu::Snafu)]
 pub enum Error {
     #[snafu(display("Error loading DB: {}", source))]
-    DbError { source: redb::Error },
+    Db { source: redb::Error },
 
     #[snafu(display("Error loading Onedrive: {}", error))]
     Onedrive { error: String },
 
     #[snafu(display("Error IO: {}", source))]
-    IoError { source: std::io::Error },
+    Io { source: std::io::Error },
 }
