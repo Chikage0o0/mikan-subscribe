@@ -55,4 +55,4 @@ chown -R subscribe:subscribe /app
 
 # 启动
 echo "即将启动..."
-exec su-exec subscribe /app/bin --subscribe ${URL}
+exec su-exec subscribe /app/mikan-subscriber

@@ -1,0 +1,6 @@
+/target
+
+
+settings.json
+store.db
+*.gguf
