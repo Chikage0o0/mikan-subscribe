@@ -1,5 +1,6 @@
 use chrono::Datelike;
 use chrono::NaiveDate;
+use std::any::Any;
 use std::path::{Path, PathBuf};
 use tokio::io::AsyncSeekExt as _;
 use tokio::task::JoinHandle;
@@ -70,12 +71,23 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                         let file = file.unwrap();
                         let size = file.metadata().await.unwrap().len();
                         let mut reader = tokio::io::BufReader::new(file);
-                        for backend in &backend {
+                        for (name, backend) in &backend {
                             reader.seek(std::io::SeekFrom::Start(0)).await.unwrap();
                             let ret = backend.upload(&mut reader, size, upload_path.clone()).await;
                             if let Err(e) = ret {
                                 tracing::error!("Error uploading: {}", e);
                                 continue;
+                            }
+
+                            // if downcast onedrive backend successful
+                            let b = backend as &dyn Any;
+                            if let Some(b) = b.downcast_ref::<upload_backend::backend::Onedrive>() {
+                                let refresh_token = b.refresh_token();
+                                let db = Db::get_onedrive().unwrap();
+                                db.insert_refresh_token(refresh_token, name.clone())
+                                    .unwrap_or_else(|e| {
+                                        tracing::error!("Error inserting refresh token: {}", e);
+                                    });
                             }
                         }
 

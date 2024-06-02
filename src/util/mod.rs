@@ -2,7 +2,7 @@ pub mod config;
 pub mod llama;
 pub mod reqwest;
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use snafu::ResultExt;
 
@@ -13,16 +13,19 @@ use crate::store;
 
 pub async fn convert_storage(
     storage: Vec<config::Storage>,
-) -> Result<Vec<Box<dyn Backend + Send + Sync>>, Error> {
+) -> Result<HashMap<String, Box<dyn Backend + Send + Sync>>, Error> {
     let db = store::Db::get_onedrive().context(DbSnafu)?;
 
-    let mut backends: Vec<Box<dyn Backend + Send + Sync>> = Vec::new();
-    for s in storage {
+    let mut backends: HashMap<String, Box<dyn Backend + Send + Sync>> = HashMap::new();
+    for (i, s) in storage.into_iter().enumerate() {
         match s {
             config::Storage::Local { root } => {
                 info! {"Loading Local: {:?}", root};
                 tokio::fs::create_dir_all(&root).await.context(IoSnafu)?;
-                backends.push(Box::new(upload_backend::backend::Local::new(root)));
+                backends.insert(
+                    format!("local{}", i),
+                    Box::new(upload_backend::backend::Local::new(root)),
+                );
             }
             config::Storage::Onedrive {
                 name,
@@ -51,7 +54,7 @@ pub async fn convert_storage(
                 db.insert_refresh_token(onedrive.refresh_token(), name.clone())
                     .context(DbSnafu)?;
 
-                backends.push(Box::new(onedrive));
+                backends.insert(name, Box::new(onedrive));
             }
         }
     }
