@@ -32,6 +32,8 @@ flume = "0.11.0"
 rand = "0.8.5"
 llama_cpp = "0.3.2"
 
+[target.'cfg(target_env = "musl")'.dependencies]
+openssl-sys = { version = "0.9.102", features = ["vendored"] }
 
 [profile.release]
 panic = "abort"   # Strip expensive panic clean-up logic

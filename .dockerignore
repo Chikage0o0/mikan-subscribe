@@ -4,3 +4,4 @@
 settings.json
 store.db
 *.gguf
+Dockerfile

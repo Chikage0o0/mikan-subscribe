@@ -13,20 +13,16 @@ if [ -z "${UMASK}" ]; then
 fi
 
 if [ -z "${WORK_SPACE}" ]; then
-    WORK_SPACE="/app"
+    WORK_SPACE="/app/data"
 fi
 
 
-if [ -z "${URL}" ]; then
-    URL="123456"
-fi
 
 
 echo "=================== 启动参数 ==================="
 echo "USER_GID = ${PGID}"
 echo "USER_UID = ${PUID}"
 echo "UMASK = ${UMASK}"
-echo "URL = ${URL}"
 echo "==============================================="
 
 
@@ -55,4 +51,5 @@ chown -R subscribe:subscribe /app
 
 # 启动
 echo "即将启动..."
+cd ${WORK_SPACE}
 exec su-exec subscribe /app/mikan-subscriber
