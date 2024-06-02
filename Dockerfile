@@ -6,9 +6,6 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
     . $HOME/.cargo/env && \
     rustup target add x86_64-unknown-linux-musl
 
-
-
-
 COPY . .
 RUN . $HOME/.cargo/env && cargo build --release --target x86_64-unknown-linux-musl
 
