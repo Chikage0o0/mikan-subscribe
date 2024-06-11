@@ -172,10 +172,9 @@ async fn find_video_in_path(path: &Path) -> Option<PathBuf> {
 async fn generate_file_name(path: &Path, bangumi_id: u64) -> String {
     if let Some(l) = llama::Llama::get() {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
-        let file_name_clone = file_name.clone();
+
         let ext = path.extension().unwrap().to_str().unwrap().to_string();
-        let blocking_spawn = tokio::task::spawn_blocking(move || l.decode(&file_name_clone));
-        let ret = blocking_spawn.await.unwrap();
+        let ret = l.decode(&file_name).await;
         match ret {
             Ok(ret) => {
                 let episode = ret.episode;
@@ -258,11 +257,8 @@ mod tests {
     async fn test_generate_file_name() {
         let settings = util::config::Settings::load_from_file("settings.json").unwrap();
         let _ = init_client(settings.proxy).unwrap();
-        if let Some(llama) = settings.llama_model {
-            let blocking_spawn = tokio::task::spawn_blocking(move || llama::Llama::init(&llama));
-            if let Err(e) = blocking_spawn.await.unwrap() {
-                eprintln!("Error loading llama model: {}", e);
-            }
+        if let Some(llama) = settings.llama {
+            llama::Llama::init(&llama.model, &llama.url, &llama.token).unwrap();
         }
         let path = std::path::Path::new(
             "[Up to 21°C] Henjin no Salad Bowl - 09 (CR 1920x1080 AVC AAC MKV) [37D7B6CE].mkv",

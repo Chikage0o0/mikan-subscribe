@@ -32,7 +32,13 @@ pub struct Settings {
     pub subscribe: String,
     pub download: Download,
     pub proxy: Option<String>,
-    pub llama_model: Option<PathBuf>,
+    pub llama: Option<Llama>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Llama {
+    pub model: String,
+    pub url: String,
+    pub token: String,
 }
 
 impl Settings {
@@ -72,7 +78,7 @@ mod tests {
                 max_download_hours: 24.0,
             },
             proxy: None,
-            llama_model: None,
+            llama: None,
         };
 
         settings.save_to_file(SETTINGS).unwrap();

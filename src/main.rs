@@ -29,11 +29,8 @@ async fn main() {
 
     let settings = util::config::Settings::load_from_file("settings.json").unwrap();
     let _ = init_client(settings.proxy).unwrap();
-    if let Some(llama) = settings.llama_model {
-        let blocking_spawn = tokio::task::spawn_blocking(move || llama::Llama::init(&llama));
-        if let Err(e) = blocking_spawn.await.unwrap() {
-            error!("Error loading llama model: {}", e);
-        }
+    if let Some(llama) = settings.llama {
+        llama::Llama::init(&llama.model, &llama.url, &llama.token).unwrap();
     }
 
     let _upload_worker = worker::upload_video(settings.storage).await;
