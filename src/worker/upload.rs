@@ -71,11 +71,15 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                         let file = file.unwrap();
                         let size = file.metadata().await.unwrap().len();
                         let mut reader = tokio::io::BufReader::new(file);
+
+                        // 标记是否上传成功
+                        let mut success = true;
                         for (name, backend) in &backend {
                             reader.seek(std::io::SeekFrom::Start(0)).await.unwrap();
                             let ret = backend.upload(&mut reader, size, upload_path.clone()).await;
                             if let Err(e) = ret {
                                 tracing::error!("Error uploading: {}", e);
+                                success = false;
                                 continue;
                             }
 
@@ -92,21 +96,22 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                         }
 
                         // set state to Finished
+                        if success {
+                            download_db
+                                .update_state(
+                                    name.clone(),
+                                    crate::store::DownloadTaskState::Finished {
+                                        file_path: file_path.clone(),
+                                        info_hash,
+                                        finish_time: chrono::Utc::now().timestamp() as u64,
+                                    },
+                                )
+                                .unwrap_or_else(|e| {
+                                    tracing::error!("Error updating state: {}", e);
+                                });
 
-                        download_db
-                            .update_state(
-                                name.clone(),
-                                crate::store::DownloadTaskState::Finished {
-                                    file_path: file_path.clone(),
-                                    info_hash,
-                                    finish_time: chrono::Utc::now().timestamp() as u64,
-                                },
-                            )
-                            .unwrap_or_else(|e| {
-                                tracing::error!("Error updating state: {}", e);
-                            });
-
-                        info!("Uploaded: {}", name);
+                            info!("Uploaded: {}", name);
+                        }
                     }
                     _ => unreachable!(),
                 }
