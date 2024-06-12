@@ -16,9 +16,6 @@ if [ -z "${WORK_SPACE}" ]; then
     WORK_SPACE="/app/data"
 fi
 
-
-
-
 echo "=================== 启动参数 ==================="
 echo "USER_GID = ${PGID}"
 echo "USER_UID = ${PUID}"
