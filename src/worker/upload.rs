@@ -174,9 +174,11 @@ async fn generate_file_name(path: &Path, bangumi_id: u64) -> String {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_string();
 
         let ext = path.extension().unwrap().to_str().unwrap().to_string();
+        info!("Use llama to decode {}", file_name);
         let ret = l.decode(&file_name).await;
         match ret {
             Ok(ret) => {
+                info!("Decode result: {:?}", ret);
                 let episode = ret.episode;
 
                 let client = client()

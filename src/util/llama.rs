@@ -121,7 +121,7 @@ impl Llama {
         let choice = res.choices.first().ok_or("No choice")?;
         let message = &choice.message.content;
         for line in message.lines() {
-            println!("{}", line);
+            // println!("{}", line);
             if let Ok(content) = serde_json::from_str::<ContentResponse>(line) {
                 return Ok(content);
             }
