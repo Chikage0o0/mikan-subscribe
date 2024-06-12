@@ -1,26 +1,23 @@
 # 设置多阶段构建基础镜像
-FROM rust:latest as builder
+FROM rust:alpine as builder
 
-# 安装必要的工具和依赖
-RUN apt-get update && apt-get install -y musl-tools
+# # 安装必要的工具和依赖
+RUN apk add --no-cache pkgconfig build-base perl 
 
 # 设置工作目录
 WORKDIR /build
 
 # 复制源码
 COPY . .
-ARG TARGETARCH
-# 为x86_64和aarch64目标添加musl工具链
-RUN if [ "$TARGETARCH" = "amd64" ]; then rustup target add x86_64-unknown-linux-musl; else rustup target add aarch64-unknown-linux-musl; fi
-# 编译
-RUN if [ "$TARGETARCH" = "amd64" ]; then cargo build --release --target x86_64-unknown-linux-musl; else cargo build --release --target aarch64-unknown-linux-musl; fi
+
+RUN cargo build --release
 
 # 使用Alpine镜像作为最终运行时环境
 FROM alpine:latest
 WORKDIR /app
 
 # 根据平台选择对应的构建产物
-COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/mikan-subscriber /app/mikan-subscriber
+COPY --from=builder /build/target/release/mikan-subscriber /app/mikan-subscriber
 COPY entrypoint.sh /app/entrypoint.sh
 
 RUN addgroup --gid 1000 subscribe && \
