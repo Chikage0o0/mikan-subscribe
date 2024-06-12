@@ -21,6 +21,7 @@ WORKDIR /app
 
 # 根据平台选择对应的构建产物
 COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/mikan-subscriber /app/mikan-subscriber
+COPY entrypoint.sh /app/entrypoint.sh
 
 RUN addgroup --gid 1000 subscribe && \
     adduser --uid 1000 --ingroup subscribe --disabled-password subscribe && \
