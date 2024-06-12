@@ -36,6 +36,12 @@ if [ -n "${PUID}" ] && [ "${PUID}" != "`id -u subscribe`" ]; then
     sed -i -e "s/^subscribe:\([^:]*\):[0-9]*:\([0-9]*\)/subscribe:\1:${PUID}:\2/" /etc/passwd
 fi
 
+# 检测工作目录
+if [ ! -d "${WORK_SPACE}" ]; then
+    echo "工作目录不存在，创建工作目录..."
+    mkdir -p ${WORK_SPACE}
+fi
+
 # 更新umask?
 if [ -n "${UMASK}" ]; then
     echo "更新umask..."
