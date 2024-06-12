@@ -1,0 +1,33 @@
+{
+  "storage": [
+    {
+      "Local": {
+        "root": "d"
+      }
+    },
+    {
+      "Onedrive": {
+        "name": "name",
+        "client_id": "client_id",
+        "client_secret": "client",
+        "root": "root",
+        "api_type": "Organizations"
+      }
+    }
+  ],
+  "subscribe": "https://example.com",
+  "download": {
+    "tmp_dir": "tmp",
+    "upnp": false,
+    "download_port": 6881,
+    "threads": 5,
+    "seed_hours": 1.0,
+    "max_download_hours": 24.0
+  },
+  "proxy": "socks5://127.0.0.1:1080",
+  "llama": {
+    "model": "model",
+    "url": "url",
+    "token": "token"
+  }
+}

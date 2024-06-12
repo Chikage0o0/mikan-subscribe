@@ -60,14 +60,25 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
+    use upload_backend::backend::OnedriveApiType;
+
     use super::*;
 
-    const SETTINGS: &str = "settings.json";
+    const SETTINGS: &str = "settings.json.example";
 
     #[test]
     fn test_settings_file() {
         let settings = Settings {
-            storage: vec![Storage::Local { root: "d".into() }],
+            storage: vec![
+                Storage::Local { root: "d".into() },
+                Storage::Onedrive {
+                    name: "name".into(),
+                    client_id: "client_id".into(),
+                    client_secret: "client".into(),
+                    root: "root".into(),
+                    api_type: OnedriveApiType::Organizations,
+                },
+            ],
             subscribe: "https://example.com".to_string(),
             download: Download {
                 tmp_dir: "tmp".into(),
@@ -77,8 +88,12 @@ mod tests {
                 seed_hours: 1.0,
                 max_download_hours: 24.0,
             },
-            proxy: None,
-            llama: None,
+            proxy: Some("socks5://127.0.0.1:1080".to_string()),
+            llama: Some(Llama {
+                model: "model".into(),
+                url: "url".into(),
+                token: "token".into(),
+            }),
         };
 
         settings.save_to_file(SETTINGS).unwrap();
