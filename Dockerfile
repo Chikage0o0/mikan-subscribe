@@ -1,43 +1,32 @@
-# 多平台构建的基础镜像
-FROM ghcr.io/cross-rs/x86_64-unknown-linux-musl:latest as builder-x86_64
-FROM ghcr.io/cross-rs/aarch64-unknown-linux-musl:latest as builder-aarch64
+# 设置多阶段构建基础镜像
+FROM rust:latest as builder
 
-# 设置构建环境并构建x86_64架构的二进制
-FROM builder-x86_64 as x86_64-builder
+# 安装必要的工具和依赖
+RUN apt-get update && apt-get install -y musl-tools
+
+# 设置工作目录
 WORKDIR /build
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    . $HOME/.cargo/env && \
-    rustup target add x86_64-unknown-linux-musl
 
+# 复制源码
 COPY . .
-RUN . $HOME/.cargo/env && cargo build --release --target x86_64-unknown-linux-musl
-
-# 设置构建环境并构建aarch64架构的二进制
-FROM builder-aarch64 as aarch64-builder
-WORKDIR /build
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    . $HOME/.cargo/env && \
-    rustup target add aarch64-unknown-linux-musl
-
-COPY . .
-RUN . $HOME/.cargo/env && cargo build --release --target aarch64-unknown-linux-musl
+ARG TARGETARCH
+# 为x86_64和aarch64目标添加musl工具链
+RUN if [ "$TARGETARCH" = "amd64" ]; then rustup target add x86_64-unknown-linux-musl; else rustup target add aarch64-unknown-linux-musl; fi
+# 编译
+RUN if [ "$TARGETARCH" = "amd64" ]; then cargo build --release --target x86_64-unknown-linux-musl; else cargo build --release --target aarch64-unknown-linux-musl; fi
 
 # 使用Alpine镜像作为最终运行时环境
 FROM alpine:latest
 WORKDIR /app
 
 # 根据平台选择对应的构建产物
-ARG TARGETARCH
-COPY entrypoint.sh /app
-COPY --from=x86_64-builder /build/target/x86_64-unknown-linux-musl/release/mikan-subscriber /app/mikan-subscriber-x86_64
-COPY --from=aarch64-builder /build/target/aarch64-unknown-linux-musl/release/mikan-subscriber /app/mikan-subscriber-aarch64
-RUN if [ "$TARGETARCH" = "amd64" ]; then mv /app/mikan-subscriber-x86_64 /app/mikan-subscriber; else mv /app/mikan-subscriber-aarch64 /app/mikan-subscriber; fi && \
-    rm -f /app/mikan-subscriber-x86_64 /app/mikan-subscriber-aarch64
+COPY --from=builder /build/target/x86_64-unknown-linux-musl/release/mikan-subscriber /app/mikan-subscriber
 
 RUN addgroup --gid 1000 subscribe && \
     adduser --uid 1000 --ingroup subscribe --disabled-password subscribe && \
     apk add --no-cache ca-certificates su-exec tzdata && \
     chown -R subscribe:subscribe /app && \
-    chmod 755 /app/entrypoint.sh 
+    chmod 755 /app/entrypoint.sh  && \
+    chmod 755 /app/mikan-subscriber
 
 ENTRYPOINT [ "/app/entrypoint.sh" ]
