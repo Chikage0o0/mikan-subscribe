@@ -13,6 +13,17 @@
         "root": "root",
         "api_type": "Organizations"
       }
+    },
+    {
+      "Webdav": {
+        "name": "name",
+        "url": "url",
+        "auth": {
+          "type": "basic",
+          "username": "user",
+          "password": "pass"
+        }
+      }
     }
   ],
   "subscribe": "https://example.com",

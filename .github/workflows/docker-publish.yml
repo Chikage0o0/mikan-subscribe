@@ -54,7 +54,7 @@ jobs:
         uses: docker/build-push-action@v5 # v5.0.0 # 使用Buildx构建并推送Docker镜像
         with:
           context: .
-          platforms: linux/amd64,linux/arm64 # 指定支持的架构
+          platforms: linux/amd64,linux/arm64,linux/riscv64 # 构建多平台镜像
           push: ${{ github.event_name != 'pull_request' }} # 不是PR时推送
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha

@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use config::{Config, ConfigError, Environment, File};
-use serde::{Deserialize, Serialize};
+use serde::{ser::SerializeMap as _, Deserialize, Serialize};
+use upload_backend::backend;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Storage {
@@ -15,7 +16,69 @@ pub enum Storage {
         root: PathBuf,
         api_type: upload_backend::backend::OnedriveApiType,
     },
+    Webdav {
+        name: String,
+        url: String,
+        auth: WebdavAuth,
+    },
 }
+
+#[derive(Debug, Clone)]
+pub struct WebdavAuth(pub backend::WebdavAuth);
+
+impl Serialize for WebdavAuth {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match &self.0 {
+            backend::WebdavAuth::Basic(username, password) => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("type", "basic")?;
+                map.serialize_entry("username", username)?;
+                map.serialize_entry("password", password)?;
+                map.end()
+            }
+            backend::WebdavAuth::Digest(username, password) => {
+                let mut map = serializer.serialize_map(Some(3))?;
+                map.serialize_entry("type", "digest")?;
+                map.serialize_entry("username", username)?;
+                map.serialize_entry("password", password)?;
+                map.end()
+            }
+            backend::WebdavAuth::Anonymous => {
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("type", "anonymous")?;
+                map.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for WebdavAuth {
+    fn deserialize<D>(deserializer: D) -> Result<WebdavAuth, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let auth = match value.get("type").and_then(|v| v.as_str()) {
+            Some("basic") => {
+                let username = value.get("username").and_then(|v| v.as_str()).unwrap();
+                let password = value.get("password").and_then(|v| v.as_str()).unwrap();
+                backend::WebdavAuth::Basic(username.into(), password.into())
+            }
+            Some("digest") => {
+                let username = value.get("username").and_then(|v| v.as_str()).unwrap();
+                let password = value.get("password").and_then(|v| v.as_str()).unwrap();
+                backend::WebdavAuth::Digest(username.into(), password.into())
+            }
+            Some("anonymous") => backend::WebdavAuth::Anonymous,
+            _ => return Err(serde::de::Error::custom("invalid auth type")),
+        };
+        Ok(WebdavAuth(auth))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Download {
     pub tmp_dir: PathBuf,
@@ -77,6 +140,11 @@ mod tests {
                     client_secret: "client".into(),
                     root: "root".into(),
                     api_type: OnedriveApiType::Organizations,
+                },
+                Storage::Webdav {
+                    name: "name".into(),
+                    url: "url".into(),
+                    auth: WebdavAuth(backend::WebdavAuth::Basic("user".into(), "pass".into())),
                 },
             ],
             subscribe: "https://example.com".to_string(),

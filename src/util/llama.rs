@@ -191,10 +191,10 @@ mod tests {
         }
 
         let filename =
-            "[ANi] 她來自煩星（僅限港澳台地區） - 02 [1080P][Bilibili][WEB-DL][AAC AVC][CHT CHS].mp4";
+            "[KitaujiSub] Shuumatsu Train Doko e Iku [11][WebRip][HEVC_AAC][CHS&CHT].mkv";
         let content = Llama::get().unwrap().decode(filename).await.unwrap();
-        assert_eq!(content.title, "她來自煩星");
+        assert_eq!(content.title, "Shuumatsu Train Doko e Iku");
         assert_eq!(content.season, 1);
-        assert_eq!(content.episode, 2);
+        assert_eq!(content.episode, 11);
     }
 }

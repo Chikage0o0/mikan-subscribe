@@ -70,13 +70,23 @@ pub async fn upload_video(storages: Vec<Storage>) -> JoinHandle<()> {
                         }
                         let file = file.unwrap();
                         let size = file.metadata().await.unwrap().len();
-                        let mut reader = tokio::io::BufReader::new(file);
 
                         // 标记是否上传成功
                         let mut success = true;
                         for (name, backend) in &backend {
-                            reader.seek(std::io::SeekFrom::Start(0)).await.unwrap();
-                            let ret = backend.upload(&mut reader, size, upload_path.clone()).await;
+                            let file = file.try_clone().await;
+                            if let Err(e) = file {
+                                tracing::error!("Error cloning file: {}", e);
+                                success = false;
+                                continue;
+                            }
+                            let mut file = file.unwrap();
+                            file.seek(std::io::SeekFrom::Start(0)).await.unwrap();
+                            let reader = tokio::io::BufReader::new(file);
+
+                            let ret = backend
+                                .upload(Box::new(reader), size, upload_path.clone())
+                                .await;
                             if let Err(e) = ret {
                                 tracing::error!("Error uploading: {}", e);
                                 success = false;

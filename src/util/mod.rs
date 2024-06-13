@@ -27,6 +27,15 @@ pub async fn convert_storage(
                     Box::new(upload_backend::backend::Local::new(root)),
                 );
             }
+            config::Storage::Webdav { name, url, auth } => {
+                info! {"Loading Webdav: {}", name};
+                let webdav = upload_backend::backend::Webdav::new(auth.0, &url).await;
+                if webdav.is_err() {
+                    warn!("Error loading {} Webdav", name);
+                    continue;
+                }
+                backends.insert(name, Box::new(webdav.unwrap()));
+            }
             config::Storage::Onedrive {
                 name,
                 client_id,
