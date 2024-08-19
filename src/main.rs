@@ -26,6 +26,7 @@ async fn main() {
             !metadata.target().starts_with("librqbit")
                 && !metadata.target().starts_with("llama")
                 && !metadata.target().starts_with("h2")
+                && !metadata.target().starts_with("hyper")
         }));
     tracing_subscriber::registry().with(filtered_layer).init();
 
