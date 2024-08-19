@@ -18,6 +18,7 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
     let thread_num = setting.threads;
 
     let mut threads = Vec::with_capacity(thread_num as usize);
+    let download_dir = setting.tmp_dir.clone();
     let session = bt::SessionGuard::get(setting).await.context(SessionSnafu)?;
     let db = store::Db::get_download().context(DbSnafu)?;
 
@@ -28,6 +29,7 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
         let rx_clone = rx.clone();
         let session_clone = session.clone();
         let db_clone = db.clone();
+        let download_dir = download_dir.clone();
 
         let handle = tokio::spawn(async move {
             loop {
@@ -77,7 +79,7 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
 
                 // download file or folder
                 let file_name = handle.info().info.name.to_owned().unwrap().to_string();
-                let file_path = handle.info().out_dir.join(&file_name);
+                let file_path = download_dir.join(&file_name);
                 tracing::info!("Finished downloading: {}", name);
 
                 let info_hash = handle.info().info_hash.to_owned().as_string();
