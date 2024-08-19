@@ -23,7 +23,9 @@ async fn main() {
     let filtered_layer = fmt::layer()
         .with_filter(FilterFn::new(|metadata| metadata.level() <= &Level::DEBUG))
         .with_filter(FilterFn::new(|metadata| {
-            !metadata.target().starts_with("librqbit") && !metadata.target().starts_with("llama")
+            !metadata.target().starts_with("librqbit")
+                && !metadata.target().starts_with("llama")
+                && !metadata.target().starts_with("h2")
         }));
     tracing_subscriber::registry().with(filtered_layer).init();
 
