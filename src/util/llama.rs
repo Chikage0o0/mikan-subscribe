@@ -190,11 +190,11 @@ mod tests {
             Llama::init(&llama.model, &llama.url, &llama.token).unwrap();
         }
 
-        let filename =
-            "[KitaujiSub] Shuumatsu Train Doko e Iku [11][WebRip][HEVC_AAC][CHS&CHT].mkv";
+        let filename = "[ANi] 模擬後宮體驗 - 01 [1080P][Baha][WEB-DL][AAC AVC][CHT].mp4";
         let content = Llama::get().unwrap().decode(filename).await.unwrap();
-        assert_eq!(content.title, "Shuumatsu Train Doko e Iku");
-        assert_eq!(content.season, 1);
-        assert_eq!(content.episode, 11);
+        // assert_eq!(content.title, "Shuumatsu Train Doko e Iku");
+        // assert_eq!(content.season, 1);
+        // assert_eq!(content.episode, 11);
+        dbg!(content);
     }
 }

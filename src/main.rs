@@ -21,7 +21,7 @@ use worker::DownloadHandle;
 #[tokio::main]
 async fn main() {
     let filtered_layer = fmt::layer()
-        .with_filter(FilterFn::new(|metadata| metadata.level() < &Level::DEBUG))
+        .with_filter(FilterFn::new(|metadata| metadata.level() <= &Level::DEBUG))
         .with_filter(FilterFn::new(|metadata| {
             !metadata.target().starts_with("librqbit") && !metadata.target().starts_with("llama")
         }));
