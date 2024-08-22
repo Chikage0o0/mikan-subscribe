@@ -34,6 +34,7 @@ pub enum TaskState {
         info_hash: String,
         finish_time: u64,
     },
+    Blocked,
 }
 
 impl Tasks {
@@ -107,6 +108,19 @@ impl Tasks {
         }
         Ok(result)
     }
+
+    #[allow(dead_code)]
+    pub fn get_all(&self) -> Result<HashMap<String, Task>, Error> {
+        let read_txn = self.0.begin_read()?;
+        let table = read_txn.open_table(TABLE)?;
+
+        let mut iter = table.range::<String>(..)?;
+        let mut result = HashMap::new();
+        while let Some(Ok((key, value))) = iter.next() {
+            result.insert(key.value().to_owned(), value.value().to_owned());
+        }
+        Ok(result)
+    }
 }
 
 impl Value for Task {
@@ -138,5 +152,19 @@ impl Value for Task {
         Self: 'a,
     {
         bincode::deserialize(data).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::store::Db;
+
+    #[test]
+    fn test_list_all() {
+        let db = Db::get_download().unwrap();
+        db.init().unwrap();
+
+        let all = db.get_all().unwrap();
+        dbg!(all);
     }
 }

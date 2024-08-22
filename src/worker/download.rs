@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use librqbit::dht::Id20;
 use snafu::{ResultExt, Snafu};
-use tokio::select; // Add this import
+use tokio::select;
+use tracing::debug;
 
 use crate::{
     bt,
@@ -39,16 +40,33 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
 
                 tracing::info!("Downloading: {}", name);
                 // Add torrent
-                let ret = session_clone.add_torrent(&magnet).await;
-                if let Err(e) = &ret {
-                    tracing::error!("Error adding torrent: {}", e);
-                    continue;
-                }
+                let ret = select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(max_download_seconds)) => {
+                        tracing::error!("Download timeout: {}", name);
+                        // set to blocked
+                        db_clone.update_state(name.clone(), store::DownloadTaskState::Blocked).unwrap_or_else(|e| {
+                            tracing::error!("Error updating state: {}", e);
+                        });
+
+                        continue;
+                    }
+                    ret = session_clone.add_torrent(&magnet)=> {
+
+                        if let Err(e) = &ret {
+                            tracing::error!("Error downloading: {}", e);
+                            continue;
+                        }
+
+                        ret
+                    }
+                };
+
                 let (id, handle) = ret.unwrap();
 
                 // Update state to downloading
                 let ret =
                     db_clone.update_state(name.clone(), store::DownloadTaskState::Downloading);
+                debug!("Update state to downloading: {}", name);
                 if let Err(e) = &ret {
                     tracing::error!("Error updating state: {}", e);
                     continue;
@@ -62,8 +80,8 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
                         session_clone.delete_torrent_by_id(id).unwrap_or_else(|e| {
                             tracing::error!("Error deleting torrent: {}", e);
                         });
-                        db_clone.delete(&name).unwrap_or_else(|e| {
-                            tracing::error!("Error deleting download: {}", e);
+                        db_clone.update_state(name.clone(), store::DownloadTaskState::Blocked).unwrap_or_else(|e| {
+                            tracing::error!("Error updating state: {}", e);
                         });
 
                         continue;
