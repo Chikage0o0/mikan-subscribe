@@ -27,7 +27,7 @@ impl SessionGuard {
         }
 
         let option = SessionOptions {
-            persistence: false,
+            persistence: None,
             enable_upnp_port_forwarding: download.upnp,
             listen_port_range: Some(Range {
                 start: download.download_port,
@@ -74,31 +74,26 @@ impl SessionGuard {
         Ok((id, handle))
     }
 
-    pub fn delete_torrent_by_hash(&self, info_hash: Id20) -> Result<(), Error> {
+    pub async fn delete_torrent_by_hash(&self, info_hash: Id20) -> Result<(), Error> {
         let session = self.0.clone();
-
-        let id = session.with_torrents(|torrents| {
-            for (id, torrent) in torrents {
-                if torrent.info_hash() == info_hash {
-                    return Ok(id);
-                }
-            }
-            Err(Error::Delete {
-                error: format!("Torrent not found: {:?}", info_hash),
-            })
-        })?;
-        session.delete(id, true).map_err(|error| Error::Delete {
-            error: error.to_string(),
-        })?;
+        session
+            .delete(librqbit::api::TorrentIdOrHash::Hash(info_hash), true)
+            .await
+            .map_err(|error| Error::Delete {
+                error: error.to_string(),
+            })?;
 
         Ok(())
     }
 
-    pub fn delete_torrent_by_id(&self, id: usize) -> Result<(), Error> {
+    pub async fn delete_torrent_by_id(&self, id: usize) -> Result<(), Error> {
         let session = self.0.clone();
-        session.delete(id, true).map_err(|error| Error::Delete {
-            error: error.to_string(),
-        })?;
+        session
+            .delete(librqbit::api::TorrentIdOrHash::Id(id), true)
+            .await
+            .map_err(|error| Error::Delete {
+                error: error.to_string(),
+            })?;
 
         Ok(())
     }
@@ -135,7 +130,9 @@ mod test {
             .1
             .info_hash().as_string();
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        let result = session.delete_torrent_by_hash(info_hash.parse().unwrap());
+        let result = session
+            .delete_torrent_by_hash(info_hash.parse().unwrap())
+            .await;
         assert!(result.is_ok());
     }
 }

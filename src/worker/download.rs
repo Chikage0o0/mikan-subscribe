@@ -77,7 +77,7 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
                 select! {
                     _ = tokio::time::sleep(tokio::time::Duration::from_secs(max_download_seconds)) => {
                         tracing::error!("Download timeout: {}", name);
-                        session_clone.delete_torrent_by_id(id).unwrap_or_else(|e| {
+                        session_clone.delete_torrent_by_id(id).await.unwrap_or_else(|e| {
                             tracing::error!("Error deleting torrent: {}", e);
                         });
                         db_clone.update_state(name.clone(), store::DownloadTaskState::Blocked).unwrap_or_else(|e| {
@@ -96,11 +96,20 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
                 };
 
                 // download file or folder
-                let file_name = handle.info().info.name.to_owned().unwrap().to_string();
+                let file_name = handle
+                    .shared()
+                    .info
+                    .name
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| {
+                        tracing::error!("Error getting file name: {}", name);
+                        return "".to_owned();
+                    });
                 let file_path = download_dir.join(&file_name);
                 tracing::info!("Finished downloading: {}", name);
 
-                let info_hash = handle.info().info_hash.to_owned().as_string();
+                let info_hash = handle.info_hash().to_owned().as_string();
 
                 let ret = db_clone.update_state(
                     name.clone(),
@@ -199,14 +208,7 @@ impl DownloadHandle {
             // sleep 随机时间，避免同时清理
             tokio::time::sleep(tokio::time::Duration::from_secs(rand::random::<u64>() % 60)).await;
             loop {
-                let handle_cloned = handle_cloned.clone();
-                let blocking_handle = tokio::task::spawn_blocking(move || {
-                    handle_cloned.delete_finished().unwrap_or_else(|e| {
-                        tracing::error!("Error deleting finished: {}", e);
-                    });
-                });
-
-                blocking_handle.await.unwrap_or_else(|e| {
+                handle_cloned.delete_finished().await.unwrap_or_else(|e| {
                     tracing::error!("Error deleting finished: {}", e);
                 });
 
@@ -218,15 +220,16 @@ impl DownloadHandle {
     }
 
     // Delete download record
-    fn delete_download(&self, info_hash: Id20) -> Result<(), Error> {
+    async fn delete_download(&self, info_hash: Id20) -> Result<(), Error> {
         self.session
             .delete_torrent_by_hash(info_hash)
+            .await
             .context(SessionSnafu)?;
         Ok(())
     }
 
     // Delete download records that have been finished for a certain amount of time
-    fn delete_finished(&self) -> Result<(), Error> {
+    async fn delete_finished(&self) -> Result<(), Error> {
         let db = store::Db::get_download().context(DbSnafu)?;
         let ret = db
             .get_with_state(|state| matches!(state, store::DownloadTaskState::Finished { .. }))
@@ -240,7 +243,7 @@ impl DownloadHandle {
                     file_path,
                 } => {
                     if finish_time + self.seed_seconds < chrono::Utc::now().timestamp() as u64 {
-                        let ret = self.delete_download(info_hash.parse().unwrap());
+                        let ret = self.delete_download(info_hash.parse().unwrap()).await;
                         if let Err(e) = ret {
                             tracing::warn!(
                                 "Error deleting download: {},try to directly rm file",
