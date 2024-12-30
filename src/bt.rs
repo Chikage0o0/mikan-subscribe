@@ -97,6 +97,18 @@ impl SessionGuard {
 
         Ok(())
     }
+
+    pub async fn pause_torrent_by_handle(&self, handle: &Arc<ManagedTorrent>) -> Result<(), Error> {
+        let session = self.0.clone();
+        session
+            .pause(handle)
+            .await
+            .map_err(|error| Error::Delete {
+                error: error.to_string(),
+            })?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Snafu)]

@@ -92,6 +92,12 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
                             continue;
                         }
 
+                        if seed_seconds == 0 {
+                            session_clone.pause_torrent_by_handle(&handle).await.unwrap_or_else(|e| {
+                                tracing::error!("Error pausing: {}", e);
+                            });
+                        }
+
                     }
                 };
 
