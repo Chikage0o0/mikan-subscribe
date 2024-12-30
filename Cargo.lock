@@ -3491,7 +3491,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 [[package]]
 name = "upload-backend"
 version = "0.1.0"
-source = "git+https://github.com/Chikage0o0/upload-backend.git#fdf2a005727ef5f1095111413c3c3fed4cefa23b"
+source = "git+https://github.com/Chikage0o0/upload-backend.git#4967a3ae2948ea86517cc590323640b15cd7d526"
 dependencies = [
  "arc-swap",
  "async-trait",
