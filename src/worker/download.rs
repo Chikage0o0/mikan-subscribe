@@ -102,16 +102,10 @@ async fn download_handle(setting: Download) -> Result<DownloadHandle, Error> {
                 };
 
                 // download file or folder
-                let file_name = handle
-                    .shared()
-                    .info
-                    .name
-                    .as_ref()
-                    .map(|v| v.to_string())
-                    .unwrap_or_else(|| {
-                        tracing::error!("Error getting file name: {}", name);
-                        return "".to_owned();
-                    });
+                let file_name = handle.name().unwrap_or_else(|| {
+                    tracing::error!("Error getting file name: {}", name);
+                    return "".to_owned();
+                });
                 let file_path = download_dir.join(&file_name);
                 tracing::info!("Finished downloading: {}", name);
 

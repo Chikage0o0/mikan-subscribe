@@ -56,7 +56,7 @@ impl Value for subscribe::Anime {
         Self: 'a,
         Self: 'b,
     {
-        bincode::serialize(value).unwrap()
+        bincode::serde::encode_to_vec(value, bincode::config::legacy()).unwrap()
     }
 
     fn type_name() -> redb::TypeName {
@@ -67,6 +67,6 @@ impl Value for subscribe::Anime {
     where
         Self: 'a,
     {
-        bincode::deserialize(data).unwrap()
+        bincode::serde::decode_from_slice(data, bincode::config::legacy()).unwrap().0
     }
 }

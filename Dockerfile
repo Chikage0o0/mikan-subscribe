@@ -1,5 +1,5 @@
 # 设置多阶段构建基础镜像
-FROM alpine:latest as builder
+FROM alpine:latest AS builder
 
 # # 安装必要的工具和依赖
 RUN apk add --no-cache pkgconfig build-base perl curl && \
